@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
-// Feel free to change the license, but this is what we use
-
-// Feel free to change this version of Solidity. We support >=0.6.0 <0.7.0;
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-// These are the core Yearn libraries
 import {
     BaseStrategy,
     StrategyParams
@@ -17,19 +13,30 @@ import {
     Address
 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-// Import interfaces for many popular DeFi projects, or add your own!
-//import "../interfaces/<protocol>/<Interface>.sol";
+import "../interfaces/maker/IMaker.sol";
 
 contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
+    // CDP Manager
+    // https://docs.makerdao.com/smart-contract-modules/proxy-module/cdp-manager-detailed-documentation
+    ManagerLike internal constant cdpManager =
+        ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
+
+    // TODO: this should be part of the constructor to support different ilks.
+    bytes32 public ilk = "YFI-A";
+
+    // Our vault identifier
+    uint256 public cdpId;
+
     constructor(address _vault) public BaseStrategy(_vault) {
         // You can set these parameters on deployment to whatever you want
         // maxReportDelay = 6300;
         // profitFactor = 100;
         // debtThreshold = 0;
+        cdpId = cdpManager.open(ilk, address(this));
     }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************

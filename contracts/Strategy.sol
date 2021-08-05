@@ -192,7 +192,8 @@ contract Strategy is BaseStrategy {
     function _getWantTokenPrice() internal view returns (uint256) {
         int256 price = chainlinkYFItoUSDPriceFeed.latestAnswer();
         require(price > 0); // dev: invalid price returned by chainlink oracle
-        return uint256(price);
+        // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
+        return uint256(price * 1e10);
     }
 
     function _depositToCdp(uint256 amount) internal {
@@ -203,23 +204,22 @@ contract Strategy is BaseStrategy {
         _checkAllowance(address(gemJoinAdapter), want, amount);
 
         uint256 price = _getWantTokenPrice();
-        uint256 daiAmountToMint = amount.mul(price).div(collateralizationRatio);
+
+        // Both `amount` and `price` are in wad, therefore amount.mul(price).div(WAD) is the total USD value
+        // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %) and multiply by 100 to correct the offset
+        uint256 daiAmountToMint =
+            amount.mul(price).div(WAD).div(collateralizationRatio).mul(100);
 
         address urn = cdpManager.urns(cdpId);
         VatLike vat = VatLike(cdpManager.vat());
 
         // Takes token amount from the strategy and joins into the vat
-        gemJoinAdapter.gem().transferFrom(
-            address(this),
-            address(gemJoinAdapter),
-            amount
-        );
         gemJoinAdapter.join(urn, amount);
 
         // Locks token amount into the CDP and generates debt
         cdpManager.frob(
             cdpId,
-            toInt(convertTo18(gemJoinAdapter, amount)),
+            toInt(amount),
             _getDrawDart(vat, urn, daiAmountToMint)
         );
 
@@ -228,7 +228,7 @@ contract Strategy is BaseStrategy {
 
         // Exits DAI to the user's wallet as a token
         vat.hope(address(daiJoinAdapter));
-        daiJoinAdapter.exit(msg.sender, daiAmountToMint);
+        daiJoinAdapter.exit(address(this), daiAmountToMint);
     }
 
     // ----------------- INTERNAL CALCS -----------------
@@ -254,15 +254,6 @@ contract Strategy is BaseStrategy {
 
     function toRad(uint256 wad) internal pure returns (uint256 rad) {
         rad = mul(wad, 10**27);
-    }
-
-    function convertTo18(GemJoinLike gemJoin, uint256 amt)
-        internal
-        returns (uint256 wad)
-    {
-        // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to frob function
-        // Adapters will automatically handle the difference of precision
-        wad = mul(amt, 10**(18 - gemJoin.dec()));
     }
 
     function _getDrawDart(

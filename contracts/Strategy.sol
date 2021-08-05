@@ -26,24 +26,14 @@ contract Strategy is BaseStrategy {
     uint256 internal constant RAY = 10**27;
     uint256 internal constant RAD = 10**45;
 
-    // CDP Manager
-    // https://docs.makerdao.com/smart-contract-modules/proxy-module/cdp-manager-detailed-documentation
     ManagerLike internal constant cdpManager =
         ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
 
     DaiJoinLike internal constant daiJoinAdapter =
         DaiJoinLike(0x9759A6Ac90977b93B58547b4A71c78317f391A28);
 
-    // Jug accumulates stability fees for a particular collateral type
-    // https://docs.makerdao.com/smart-contract-modules/rates-module/jug-detailed-documentation
     JugLike internal constant jug =
         JugLike(0x19c0976f590D67707E62397C87829d896Dc0f1F1);
-
-    // DAI yVault
-    IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
-
-    // TODO: this should be part of the constructor to support different ilks.
-    bytes32 public ilk = "YFI-A";
 
     GemJoinLike internal constant gemJoinAdapter =
         GemJoinLike(0x3ff33d9162aD47660083D7DC4bC02Fb231c81677);
@@ -51,6 +41,12 @@ contract Strategy is BaseStrategy {
     // Use Chainlink oracle to obtain latest price
     AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
         AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
+
+    // DAI yVault
+    IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
+
+    // TODO: ilk, join adapter and chainlink oracle should be dynamic to support different ilks
+    bytes32 public ilk = "YFI-A";
 
     // Our vault identifier
     uint256 public cdpId;

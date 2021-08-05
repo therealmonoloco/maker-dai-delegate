@@ -1,5 +1,5 @@
 import pytest
-from brownie import config
+from brownie import config, interface
 from brownie import Contract
 
 
@@ -40,9 +40,25 @@ def keeper(accounts):
 
 @pytest.fixture
 def token():
-    token_address = "0x6b175474e89094c44da98b954eedeac495271d0f"  # this should be the address of the ERC-20 used by the strategy/vault (DAI)
+    token_address = "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e"  # YFI
     yield Contract(token_address)
 
+
+@pytest.fixture
+def token_whale(accounts):
+    yield accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
+
+
+@pytest.fixture
+def dai():
+    dai_address = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    yield Contract(dai_address)
+
+
+@pytest.fixture
+def price_oracle():
+    chainlink_oracle = interface.AggregatorInterface("0xA027702dbb89fbd58938e4324ac03B58d812b0E1")
+    yield chainlink_oracle
 
 @pytest.fixture
 def amount(accounts, token, user):

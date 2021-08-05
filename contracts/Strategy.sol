@@ -229,6 +229,14 @@ contract Strategy is BaseStrategy {
         // Exits DAI to the user's wallet as a token
         vat.hope(address(daiJoinAdapter));
         daiJoinAdapter.exit(address(this), daiAmountToMint);
+
+        // Send DAI to yvDAI
+        _checkAllowance(
+            address(yVault),
+            IERC20(yVault.token()),
+            daiAmountToMint
+        );
+        yVault.deposit();
     }
 
     // ----------------- INTERNAL CALCS -----------------

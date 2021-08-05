@@ -32,10 +32,10 @@ def test_maker_vault_collateral_should_match_strategy(Strategy, strategist, vaul
 
 
 def test_dai_should_be_minted_after_depositing_collateral(
-    strategy, vault, token, token_whale, dai
+    strategy, vault, yvDAI, token, token_whale, dai
 ):
-    # Make sure there is no dai balance before the first deposit
-    assert dai.balanceOf(strategy) == 0
+    # Make sure there is no balance before the first deposit
+    assert yvDAI.balanceOf(strategy) == 0
 
     amount = 25 * (10 ** token.decimals())
     token.approve(vault.address, amount, {"from": token_whale})
@@ -43,13 +43,16 @@ def test_dai_should_be_minted_after_depositing_collateral(
 
     chain.sleep(1)
     strategy.harvest()
-    assert dai.balanceOf(strategy) > 0
+
+    # Minted DAI should be deposited in yvDAI
+    assert dai.balanceOf(strategy) == 0
+    assert yvDAI.balanceOf(strategy) > 0
 
 
 def test_minted_dai_should_match_collateralization_ratio(
-    strategy, vault, token, token_whale, dai, price_oracle, RELATIVE_APPROX
+    strategy, vault, yvDAI, token, token_whale, price_oracle, RELATIVE_APPROX
 ):
-    assert dai.balanceOf(strategy) == 0
+    assert yvDAI.balanceOf(strategy) == 0
 
     # Price is returned using 8 decimals
     price = price_oracle.latestAnswer() * 1e10
@@ -61,7 +64,9 @@ def test_minted_dai_should_match_collateralization_ratio(
     chain.sleep(1)
     strategy.harvest()
 
-    pytest.approx(dai.balanceOf(strategy), rel=RELATIVE_APPROX) == (
+    assert pytest.approx(
+        yvDAI.balanceOf(strategy) * yvDAI.pricePerShare() / 1e18, rel=RELATIVE_APPROX
+    ) == (
         price
         * amount
         / (10 ** token.decimals())

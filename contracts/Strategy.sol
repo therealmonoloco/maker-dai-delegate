@@ -14,6 +14,7 @@ import {
 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "../interfaces/maker/IMaker.sol";
+import "../interfaces/yearn/IVault.sol";
 
 contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
@@ -24,6 +25,9 @@ contract Strategy is BaseStrategy {
     // https://docs.makerdao.com/smart-contract-modules/proxy-module/cdp-manager-detailed-documentation
     ManagerLike internal constant cdpManager =
         ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
+
+    // DAI yVault
+    IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
 
     // TODO: this should be part of the constructor to support different ilks.
     bytes32 public ilk = "YFI-A";

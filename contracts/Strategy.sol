@@ -42,8 +42,8 @@ contract Strategy is BaseStrategy {
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {
-        // Add your own name here, suggestion e.g. "StrategyCreamYFI"
-        return "Strategy<ProtocolName><TokenType>";
+        // TODO: should be dynamic to support different ilks
+        return "StrategyMakerYFI";
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {

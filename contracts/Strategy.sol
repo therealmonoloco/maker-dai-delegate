@@ -72,8 +72,7 @@ contract Strategy is BaseStrategy {
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
-        // TODO: Build a more accurate estimate using the value of all positions in terms of `want`
-        return want.balanceOf(address(this));
+        return balanceOfWant().add(balanceOfMakerVault());
     }
 
     function prepareReturn(uint256 _debtOutstanding)
@@ -243,6 +242,15 @@ contract Strategy is BaseStrategy {
 
     function balanceOfWant() internal view returns (uint256) {
         return want.balanceOf(address(this));
+    }
+
+    function balanceOfMakerVault() internal view returns (uint256) {
+        uint256 ink;
+        uint256 art;
+        address urn = cdpManager.urns(cdpId);
+        VatLike vat = VatLike(cdpManager.vat());
+        (ink, art) = vat.urns(ilk, urn);
+        return ink;
     }
 
     // ----------------- UTILS FROM MAKERDAO DSS-PROXY-ACTIONS -----------------

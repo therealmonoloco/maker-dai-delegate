@@ -72,6 +72,10 @@ interface GemJoinLike {
     function exit(address, uint256) external;
 }
 
+interface JugLike {
+    function drip(bytes32) external returns (uint256);
+}
+
 interface OasisLike {
     function sellAllAmount(
         address pay_gem,

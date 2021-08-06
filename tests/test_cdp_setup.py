@@ -2,7 +2,7 @@ import pytest
 
 from brownie.convert import to_string
 from brownie.network.state import TxHistory
-from brownie import chain
+from brownie import chain, Wei
 
 
 def test_deploy_should_create_new_maker_vault(Strategy, strategist, vault):
@@ -50,12 +50,12 @@ def test_dai_should_be_minted_after_depositing_collateral(
 
 
 def test_minted_dai_should_match_collateralization_ratio(
-    strategy, vault, yvDAI, token, token_whale, price_oracle, RELATIVE_APPROX
+    strategy, vault, yvDAI, token, token_whale, price_oracle_usd, RELATIVE_APPROX
 ):
     assert yvDAI.balanceOf(strategy) == 0
 
     # Price is returned using 8 decimals
-    price = price_oracle.latestAnswer() * 1e10
+    price = price_oracle_usd.latestAnswer() * 1e10
 
     amount = 25 * (10 ** token.decimals())
     token.approve(vault.address, amount, {"from": token_whale})
@@ -73,3 +73,12 @@ def test_minted_dai_should_match_collateralization_ratio(
         * 100
         / strategy.collateralizationRatio()
     )
+
+
+def test_ethToWant_should_convert_to_yfi(strategy, price_oracle_eth, RELATIVE_APPROX):
+    price = price_oracle_eth.latestAnswer()
+    assert pytest.approx(
+        strategy.ethToWant(Wei("1 ether")), rel=RELATIVE_APPROX
+    ) == Wei("1 ether") / (price / 1e18)
+    assert strategy.ethToWant(Wei(price * 420)) == Wei("420 ether")
+    assert strategy.ethToWant(Wei(price * 0.5)) == Wei("0.5 ether")

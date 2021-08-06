@@ -56,9 +56,17 @@ def dai():
 
 
 @pytest.fixture
-def price_oracle():
+def price_oracle_usd():
     chainlink_oracle = interface.AggregatorInterface(
         "0xA027702dbb89fbd58938e4324ac03B58d812b0E1"
+    )
+    yield chainlink_oracle
+
+
+@pytest.fixture
+def price_oracle_eth():
+    chainlink_oracle = interface.AggregatorInterface(
+        "0x7c5d4F8345e66f68099581Db340cd65B078C41f4"
     )
     yield chainlink_oracle
 

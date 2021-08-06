@@ -38,9 +38,13 @@ contract Strategy is BaseStrategy {
     GemJoinLike internal constant gemJoinAdapter =
         GemJoinLike(0x3ff33d9162aD47660083D7DC4bC02Fb231c81677);
 
-    // Use Chainlink oracle to obtain latest price
+    // Use Chainlink oracle to obtain latest YFI/USD price
     AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
         AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
+
+    // Use Chainlink oracle to obtain latest YFI/ETH price
+    AggregatorInterface internal constant chainlinkYFItoETHPriceFeed =
+        AggregatorInterface(0x7c5d4F8345e66f68099581Db340cd65B078C41f4);
 
     // DAI yVault
     IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
@@ -148,20 +152,6 @@ contract Strategy is BaseStrategy {
         return protected;
     }
 
-    /**
-     * @notice
-     *  Provide an accurate conversion from `_amtInWei` (denominated in wei)
-     *  to `want` (using the native decimal characteristics of `want`).
-     * @dev
-     *  Care must be taken when working with decimals to assure that the conversion
-     *  is compatible. As an example:
-     *
-     *      given 1e17 wei (0.1 ETH) as input, and want is USDC (6 decimals),
-     *      with USDC/ETH = 1800, this should give back 1800000000 (180 USDC)
-     *
-     * @param _amtInWei The amount (in wei/1e-18 ETH) to convert to `want`
-     * @return The amount in `want` of `_amtInEth` converted to `want`
-     **/
     function ethToWant(uint256 _amtInWei)
         public
         view
@@ -169,8 +159,9 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256)
     {
-        // TODO create an accurate price oracle
-        return _amtInWei;
+        // YFI price in ETH with 18 decimals
+        uint256 price = uint256(chainlinkYFItoETHPriceFeed.latestAnswer());
+        return _amtInWei.mul(1e18).div(price);
     }
 
     // ----------------- INTERNAL FUNCTIONS SUPPORT -----------------

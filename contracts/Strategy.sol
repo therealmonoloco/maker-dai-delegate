@@ -126,8 +126,14 @@ contract Strategy is BaseStrategy {
     // NOTE: Can override `tendTrigger` and `harvestTrigger` if necessary
 
     function prepareMigration(address _newStrategy) internal override {
-        // TODO: Transfer any non-`want` tokens to the new strategy
-        // NOTE: `migrate` will automatically forward all `want` in this strategy to the new one
+        // Transfer Maker Vault ownership to the new startegy
+        cdpManager.give(cdpId, _newStrategy);
+
+        // Move yvDAI balance to the new strategy
+        IERC20(yVault).safeTransfer(
+            _newStrategy,
+            yVault.balanceOf(address(this))
+        );
     }
 
     function protectedTokens()

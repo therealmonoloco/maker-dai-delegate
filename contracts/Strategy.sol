@@ -68,6 +68,13 @@ contract Strategy is BaseStrategy {
         collateralizationRatio = 250;
     }
 
+    // Required to move funds to a new cdp and use a different cdpId after migration.
+    // Should only be called by governance.
+    function shiftToCdp(uint256 newCdpId) external onlyGovernance {
+        cdpManager.shift(cdpId, newCdpId);
+        cdpId = newCdpId;
+    }
+
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {
@@ -234,8 +241,8 @@ contract Strategy is BaseStrategy {
     }
 
     function balanceOfMakerVault() internal view returns (uint256) {
-        uint256 ink;
-        uint256 art;
+        uint256 ink; // collateral balance
+        uint256 art; // normalized outstanding stablecoin debt
         address urn = cdpManager.urns(cdpId);
         VatLike vat = VatLike(cdpManager.vat());
         (ink, art) = vat.urns(ilk, urn);

@@ -82,3 +82,23 @@ def test_ethToWant_should_convert_to_yfi(strategy, price_oracle_eth, RELATIVE_AP
     ) == Wei("1 ether") / (price / 1e18)
     assert strategy.ethToWant(Wei(price * 420)) == Wei("420 ether")
     assert strategy.ethToWant(Wei(price * 0.5)) == Wei("0.5 ether")
+
+
+def test_delegated_assets_pricing(
+    strategy, vault, yvDAI, token, token_whale, dai, price_oracle_usd, RELATIVE_APPROX
+):
+    amount = 25 * (10 ** token.decimals())
+    token.approve(vault.address, amount, {"from": token_whale})
+    vault.deposit(amount, {"from": token_whale})
+
+    chain.sleep(1)
+    strategy.harvest()
+
+    # Price is returned using 8 decimals
+    price = price_oracle_usd.latestAnswer() * 1e10
+
+    dai_balance = yvDAI.balanceOf(strategy) * yvDAI.pricePerShare() / 1e18
+
+    assert pytest.approx(strategy.delegatedAssets(), rel=RELATIVE_APPROX) == (
+        dai_balance / price * (10 ** token.decimals())
+    )

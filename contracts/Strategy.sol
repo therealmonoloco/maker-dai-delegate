@@ -82,6 +82,12 @@ contract Strategy is BaseStrategy {
         return "StrategyMakerYFI";
     }
 
+    function delegatedAssets() external view override returns (uint256) {
+        uint256 yvDAIShares = yVault.balanceOf(address(this));
+        uint256 wantPrice = _getWantTokenPrice();
+        return yvDAIShares.mul(yVault.pricePerShare()).div(wantPrice);
+    }
+
     function estimatedTotalAssets() public view override returns (uint256) {
         return balanceOfWant().add(balanceOfMakerVault());
     }
@@ -240,6 +246,7 @@ contract Strategy is BaseStrategy {
         return want.balanceOf(address(this));
     }
 
+    // Returns collateral balance in the vault
     function balanceOfMakerVault() internal view returns (uint256) {
         uint256 ink; // collateral balance
         uint256 art; // normalized outstanding stablecoin debt

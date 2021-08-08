@@ -180,11 +180,12 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function liquidateAllPositions() internal override returns (uint256) {
-        // TODO: Liquidate all positions and return the amount freed.
-        // Get all DAI back from yvDAI - attempt to repay debt
-        // Get all collateral back
-        return want.balanceOf(address(this));
+    function liquidateAllPositions()
+        internal
+        override
+        returns (uint256 _amountFreed)
+    {
+        (_amountFreed, ) = liquidatePosition(estimatedTotalAssets());
     }
 
     // NOTE: Can override `tendTrigger` and `harvestTrigger` if necessary

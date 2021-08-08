@@ -137,6 +137,8 @@ contract Strategy is BaseStrategy {
 
     function liquidateAllPositions() internal override returns (uint256) {
         // TODO: Liquidate all positions and return the amount freed.
+        // Get all DAI back from yvDAI - attempt to repay debt
+        // Get all collateral back
         return want.balanceOf(address(this));
     }
 
@@ -202,41 +204,21 @@ contract Strategy is BaseStrategy {
             return;
         }
 
-        _checkAllowance(address(gemJoinAdapter), want, amount);
-
         uint256 price = _getWantTokenPrice();
 
+        _checkAllowance(address(gemJoinAdapter), want, amount);
+
         // Both `amount` and `price` are in wad, therefore amount.mul(price).div(WAD) is the total USD value
-        // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %) and multiply by 100 to correct the offset
-        uint256 daiAmountToMint =
+        // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %)
+        // and multiply by 100 to correct the offset
+        uint256 daiToMint =
             amount.mul(price).div(WAD).div(collateralizationRatio).mul(100);
 
-        address urn = cdpManager.urns(cdpId);
-        VatLike vat = VatLike(cdpManager.vat());
-
-        // Takes token amount from the strategy and joins into the vat
-        gemJoinAdapter.join(urn, amount);
-
-        // Locks token amount into the CDP and generates debt
-        cdpManager.frob(
-            cdpId,
-            toInt(amount),
-            _getDrawDart(vat, urn, daiAmountToMint)
-        );
-
-        // Moves the DAI amount (balance in the vat in rad) to the strategy
-        cdpManager.move(cdpId, address(this), toRad(daiAmountToMint));
-
-        // Exits DAI to the user's wallet as a token
-        vat.hope(address(daiJoinAdapter));
-        daiJoinAdapter.exit(address(this), daiAmountToMint);
+        // Lock collateral and mint DAI
+        _lockGemAndDraw(amount, daiToMint);
 
         // Send DAI to yvDAI
-        _checkAllowance(
-            address(yVault),
-            IERC20(yVault.token()),
-            daiAmountToMint
-        );
+        _checkAllowance(address(yVault), IERC20(yVault.token()), daiToMint);
         yVault.deposit();
     }
 
@@ -275,6 +257,7 @@ contract Strategy is BaseStrategy {
         rad = mul(wad, 10**27);
     }
 
+    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L161
     function _getDrawDart(
         VatLike vat,
         address urn,
@@ -293,5 +276,33 @@ contract Strategy is BaseStrategy {
             // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
             dart = mul(uint256(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
         }
+    }
+
+    // Deposits collateral (gem) and mints DAI
+    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
+    function _lockGemAndDraw(uint256 collateralAmount, uint256 daiToMint)
+        internal
+    {
+        address urn = cdpManager.urns(cdpId);
+        VatLike vat = VatLike(cdpManager.vat());
+
+        // Takes token amount from the strategy and joins into the vat
+        gemJoinAdapter.join(urn, collateralAmount);
+
+        // Locks token amount into the CDP and generates debt
+        cdpManager.frob(
+            cdpId,
+            toInt(collateralAmount),
+            _getDrawDart(vat, urn, daiToMint)
+        );
+
+        // Moves the DAI amount (balance in the vat in rad) to the strategy
+        cdpManager.move(cdpId, address(this), toRad(daiToMint));
+
+        // Allow access to DAI balance in the vat
+        vat.hope(address(daiJoinAdapter));
+
+        // Exits DAI to the user's wallet as a token
+        daiJoinAdapter.exit(address(this), daiToMint);
     }
 }

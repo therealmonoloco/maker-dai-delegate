@@ -143,3 +143,11 @@ interface ManagerLike {
 
     function shift(uint256, uint256) external;
 }
+
+interface SpotLike {
+    function live() external view returns (uint256);
+
+    function vat() external view returns (address);
+
+    function ilks(bytes32) external view returns (address, uint256);
+}

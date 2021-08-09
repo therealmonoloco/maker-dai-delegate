@@ -70,6 +70,9 @@ contract Strategy is BaseStrategy {
     // Our desired collaterization ratio
     uint256 public collateralizationRatio;
 
+    // Allow the collateralization ratio to drift a bit in order to avoid cycles
+    uint256 public rebalanceTolerance;
+
     // Maximum acceptable lost on withdrawal. Default to 0.01%.
     uint256 public maxLoss = 1;
 
@@ -82,6 +85,8 @@ contract Strategy is BaseStrategy {
         cdpId = cdpManager.open(ilk, address(this));
         // Minimum collaterization ratio on YFI-A is 175%. Use 250% to be extra safe.
         collateralizationRatio = 250;
+        // Current ratio can drift (collateralizationRatio - 2, collateralizationRatio + 2)
+        rebalanceTolerance = 2;
     }
 
     // Required to move funds to a new cdp and use a different cdpId after migration.
@@ -152,14 +157,62 @@ contract Strategy is BaseStrategy {
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
+        // If we have enough want to deposit more into the maker vault, we do it
+        // We do not skip the rest of the function as it may need to repay or take on more debt
         uint256 wantBalance = balanceOfWant();
-
         if (wantBalance > _debtOutstanding) {
             uint256 amountToDeposit = wantBalance.sub(_debtOutstanding);
-            _depositToCdp(amountToDeposit);
+            _depositToMakerVault(amountToDeposit);
         }
 
-        // TODO: check collateralization ratio to mint more dai or pay back dai
+        // Nothing to do here if there is no collateral locked in Maker
+        if (balanceOfMakerVault() == 0) {
+            return;
+        }
+
+        // Allow the ratio to move a bit in either direction to avoid cycles
+        uint256 currentRatio = getCurrentMakerVaultRatio();
+        if (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) {
+            repayDebt(currentRatio);
+        } else if (
+            currentRatio > collateralizationRatio.add(rebalanceTolerance)
+        ) {
+            //mintMoreInvestmentToken();
+        }
+
+        // If we have anything left to invest then deposit into the yVault
+        uint256 balanceIT = balanceOfInvestmentToken();
+        if (balanceIT > 0) {
+            _checkAllowance(
+                address(yVault),
+                address(investmentToken),
+                balanceIT
+            );
+
+            yVault.deposit();
+        }
+    }
+
+    function repayDebt(uint256 currentRatio) internal {
+        // Nothing to repay if we are over the collateralization ratio
+        if (currentRatio > collateralizationRatio) {
+            return;
+        }
+
+        // ratio = collateral / debt
+        // collateral = current_ratio * current_debt
+        // collateral amount is invariant here so we want to find new_debt
+        // so that new_debt * desired_ratio = current_debt * current_ratio
+        // new_debt = current_debt * current_ratio / desired_ratio
+        // and the amount to repay is the difference between current_debt and new_debt
+        uint256 newDebt =
+            balanceOfDebt().mul(currentRatio).div(collateralizationRatio);
+
+        // We are repaying debt to increase the collateralization ratio, so the new
+        // required debt will be less than the original debt
+        uint256 amountToRepay = balanceOfDebt().sub(newDebt);
+        uint256 withdrawn = _withdrawFromYVault(amountToRepay);
+        _repayInvestmentTokenDebt(withdrawn);
     }
 
     function liquidatePosition(uint256 _amountNeeded)
@@ -227,6 +280,47 @@ contract Strategy is BaseStrategy {
 
     // ----------------- INTERNAL FUNCTIONS SUPPORT -----------------
 
+    function _withdrawFromYVault(uint256 _amountIT) internal returns (uint256) {
+        if (_amountIT == 0) {
+            return 0;
+        }
+        // No need to check allowance because the contract == token
+        uint256 balancePrior = balanceOfInvestmentToken();
+        uint256 sharesToWithdraw =
+            Math.min(
+                _investmentTokenToYShares(_amountIT),
+                yVault.balanceOf(address(this))
+            );
+        if (sharesToWithdraw == 0) {
+            return 0;
+        }
+        yVault.withdraw(sharesToWithdraw, address(this), maxLoss);
+        return balanceOfInvestmentToken().sub(balancePrior);
+    }
+
+    function _repayInvestmentTokenDebt(uint256 amount) internal {
+        if (amount == 0) {
+            return;
+        }
+
+        // We cannot pay more than loose balance
+        amount = Math.min(amount, balanceOfInvestmentToken());
+
+        // We cannot pay more than we owe
+        amount = Math.min(amount, balanceOfDebt());
+
+        _checkAllowance(
+            address(daiJoinAdapter),
+            address(investmentToken),
+            amount
+        );
+
+        if (amount > 0) {
+            // Repay debt amount without unlocking collateral
+            _wipeAndFreeGem(0, amount);
+        }
+    }
+
     function _checkAllowance(
         address _contract,
         address _token,
@@ -264,7 +358,7 @@ contract Strategy is BaseStrategy {
         return uint256(price * 1e10);
     }
 
-    function _depositToCdp(uint256 amount) internal {
+    function _depositToMakerVault(uint256 amount) internal {
         if (amount == 0) {
             return;
         }
@@ -287,7 +381,21 @@ contract Strategy is BaseStrategy {
         yVault.deposit();
     }
 
-    // ----------------- INTERNAL CALCS -----------------
+    // ----------------- INTERNAL CALCS -----------------.
+
+    function getCurrentMakerVaultRatio() internal view returns (uint256) {
+        VatLike vat = VatLike(cdpManager.vat());
+
+        // spot: collateral price with safety margin returned in rad (10**27)
+        (, , uint256 spot, , ) = vat.ilks(ilk);
+        spot = toWad(spot);
+
+        uint256 totalCollateralValue = balanceOfMakerVault().mul(spot).div(WAD);
+        uint256 totalDebt = balanceOfDebt();
+
+        uint256 ratio = totalCollateralValue.div(totalDebt).mul(100);
+        return ratio;
+    }
 
     function balanceOfWant() internal view returns (uint256) {
         return want.balanceOf(address(this));
@@ -301,14 +409,14 @@ contract Strategy is BaseStrategy {
         address urn = cdpManager.urns(cdpId);
         VatLike vat = VatLike(cdpManager.vat());
 
-        // Normalized outstanding stablecoin debt
+        // Normalized outstanding stablecoin debt [wad]
         (, uint256 art) = vat.urns(ilk, urn);
 
-        // Gets actual rate from the vat
+        // Gets actual rate from the vat [ray]
         (, uint256 rate, , , ) = vat.ilks(ilk);
 
         // Return the present value of the debt with accrued fees
-        return art.mul(rate);
+        return art.mul(rate).div(RAY);
     }
 
     // Returns collateral balance in the vault
@@ -377,44 +485,6 @@ contract Strategy is BaseStrategy {
 
     // ----------------- UTILS FROM MAKERDAO DSS-PROXY-ACTIONS -----------------
 
-    function toInt(uint256 x) internal pure returns (int256 y) {
-        y = int256(x);
-        require(y >= 0, "int-overflow");
-    }
-
-    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require(y == 0 || (z = x * y) / y == x, "mul-overflow");
-    }
-
-    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x - y) <= x, "sub-overflow");
-    }
-
-    function toRad(uint256 wad) internal pure returns (uint256 rad) {
-        rad = mul(wad, 10**27);
-    }
-
-    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L161
-    function _getDrawDart(
-        VatLike vat,
-        address urn,
-        uint256 wad
-    ) internal returns (int256 dart) {
-        // Updates stability fee rate
-        uint256 rate = jug.drip(ilk);
-
-        // Gets DAI balance of the urn in the vat
-        uint256 dai = vat.dai(urn);
-
-        // If there was already enough DAI in the vat balance, just exits it without adding more debt
-        if (dai < mul(wad, RAY)) {
-            // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
-            dart = toInt(sub(mul(wad, RAY), dai) / rate);
-            // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
-            dart = mul(uint256(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
-        }
-    }
-
     // Deposits collateral (gem) and mints DAI
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
     function _lockGemAndDraw(uint256 collateralAmount, uint256 daiToMint)
@@ -441,5 +511,91 @@ contract Strategy is BaseStrategy {
 
         // Exits DAI to the user's wallet as a token
         daiJoinAdapter.exit(address(this), daiToMint);
+    }
+
+    // Returns DAI to decrease debt and attempts to unlock any amount of collateral
+    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L758
+    function _wipeAndFreeGem(uint256 collateralAmount, uint256 daiToRepay)
+        public
+    {
+        address urn = cdpManager.urns(cdpId);
+
+        // Joins DAI amount into the vat
+        daiJoinAdapter.join(urn, daiToRepay);
+
+        // Paybacks debt to the CDP and unlocks token amount from it
+        cdpManager.frob(
+            cdpId,
+            -toInt(collateralAmount),
+            _getWipeDart(
+                cdpManager.vat(),
+                VatLike(cdpManager.vat()).dai(urn),
+                urn
+            )
+        );
+        // Moves the amount from the CDP urn to proxy's address
+        cdpManager.flux(cdpId, address(this), collateralAmount);
+
+        // Exits token amount to the strategy as a token
+        gemJoinAdapter.exit(address(this), collateralAmount);
+    }
+
+    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L161
+    function _getDrawDart(
+        VatLike vat,
+        address urn,
+        uint256 wad
+    ) internal returns (int256 dart) {
+        // Updates stability fee rate
+        uint256 rate = jug.drip(ilk);
+
+        // Gets DAI balance of the urn in the vat
+        uint256 dai = vat.dai(urn);
+
+        // If there was already enough DAI in the vat balance, just exits it without adding more debt
+        if (dai < mul(wad, RAY)) {
+            // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
+            dart = toInt(sub(mul(wad, RAY), dai) / rate);
+            // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
+            dart = mul(uint256(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
+        }
+    }
+
+    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L183
+    function _getWipeDart(
+        address vat,
+        uint256 dai,
+        address urn
+    ) internal view returns (int256 dart) {
+        // Gets actual rate from the vat
+        (, uint256 rate, , , ) = VatLike(vat).ilks(ilk);
+        // Gets actual art value of the urn
+        (, uint256 art) = VatLike(vat).urns(ilk, urn);
+
+        // Uses the whole dai balance in the vat to reduce the debt
+        dart = toInt(dai / rate);
+        // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
+        dart = uint256(dart) <= art ? -dart : -toInt(art);
+    }
+
+    function toInt(uint256 x) internal pure returns (int256 y) {
+        y = int256(x);
+        require(y >= 0, "int-overflow");
+    }
+
+    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require(y == 0 || (z = x * y) / y == x, "mul-overflow");
+    }
+
+    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require((z = x - y) <= x, "sub-overflow");
+    }
+
+    function toRad(uint256 wad) internal pure returns (uint256 rad) {
+        rad = mul(wad, 10**27);
+    }
+
+    function toWad(uint256 rad) internal pure returns (uint256 wad) {
+        wad = rad.div(10**9);
     }
 }

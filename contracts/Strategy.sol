@@ -386,7 +386,7 @@ contract Strategy is BaseStrategy {
     function getCurrentMakerVaultRatio() internal view returns (uint256) {
         VatLike vat = VatLike(cdpManager.vat());
 
-        // spot: collateral price with safety margin returned in rad (10**27)
+        // spot: collateral price with safety margin returned in ray (10**27)
         (, , uint256 spot, , ) = vat.ilks(ilk);
         spot = toWad(spot);
 
@@ -595,7 +595,7 @@ contract Strategy is BaseStrategy {
         rad = mul(wad, 10**27);
     }
 
-    function toWad(uint256 rad) internal pure returns (uint256 wad) {
-        wad = rad.div(10**9);
+    function toWad(uint256 ray) internal pure returns (uint256 wad) {
+        wad = ray.div(10**9);
     }
 }

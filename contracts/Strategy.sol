@@ -40,6 +40,9 @@ contract Strategy is BaseStrategy {
     GemJoinLike internal constant gemJoinAdapter =
         GemJoinLike(0x3ff33d9162aD47660083D7DC4bC02Fb231c81677);
 
+    SpotLike internal constant spotter =
+        SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
+
     // Use Chainlink oracle to obtain latest YFI/USD price
     AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
         AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
@@ -83,10 +86,10 @@ contract Strategy is BaseStrategy {
         // debtThreshold = 0;
         investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
-        // Minimum collaterization ratio on YFI-A is 175%. Use 250% to be extra safe.
+        // Minimum collaterization ratio on YFI-A is 175%. Use 250% as target.
         collateralizationRatio = 250;
-        // Current ratio can drift (collateralizationRatio - 2, collateralizationRatio + 2)
-        rebalanceTolerance = 2;
+        // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
+        rebalanceTolerance = 5;
     }
 
     // Required to move funds to a new cdp and use a different cdpId after migration.
@@ -407,10 +410,17 @@ contract Strategy is BaseStrategy {
         (, , uint256 spot, , ) = vat.ilks(ilk);
         spot = toWad(spot);
 
-        uint256 totalCollateralValue = balanceOfMakerVault().mul(spot).div(WAD);
+        // Liquidation ratio for the given ilk
+        // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
+        (, uint256 liquidationRatio) = spotter.ilks(ilk);
+
+        uint256 totalCollateralValue =
+            balanceOfMakerVault().mul(spot).mul(liquidationRatio).div(RAY).div(
+                WAD
+            );
         uint256 totalDebt = balanceOfDebt();
 
-        uint256 ratio = totalCollateralValue.div(totalDebt).mul(100);
+        uint256 ratio = totalCollateralValue.mul(100).div(totalDebt);
         return ratio;
     }
 

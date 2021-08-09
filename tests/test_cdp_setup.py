@@ -80,8 +80,12 @@ def test_ethToWant_should_convert_to_yfi(strategy, price_oracle_eth, RELATIVE_AP
     assert pytest.approx(
         strategy.ethToWant(Wei("1 ether")), rel=RELATIVE_APPROX
     ) == Wei("1 ether") / (price / 1e18)
-    assert strategy.ethToWant(Wei(price * 420)) == Wei("420 ether")
-    assert strategy.ethToWant(Wei(price * 0.5)) == Wei("0.5 ether")
+    assert pytest.approx(
+        strategy.ethToWant(Wei(price * 420)), rel=RELATIVE_APPROX
+    ) == Wei("420 ether")
+    assert pytest.approx(
+        strategy.ethToWant(Wei(price * 0.5)), rel=RELATIVE_APPROX
+    ) == Wei("0.5 ether")
 
 
 def test_delegated_assets_pricing(

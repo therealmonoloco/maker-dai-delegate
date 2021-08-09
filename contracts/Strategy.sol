@@ -173,11 +173,11 @@ contract Strategy is BaseStrategy {
         // Allow the ratio to move a bit in either direction to avoid cycles
         uint256 currentRatio = getCurrentMakerVaultRatio();
         if (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) {
-            repayDebt(currentRatio);
+            _repayDebt(currentRatio);
         } else if (
             currentRatio > collateralizationRatio.add(rebalanceTolerance)
         ) {
-            //mintMoreInvestmentToken();
+            _mintMoreInvestmentToken(currentRatio);
         }
 
         // If we have anything left to invest then deposit into the yVault
@@ -193,7 +193,7 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function repayDebt(uint256 currentRatio) internal {
+    function _repayDebt(uint256 currentRatio) internal {
         // Nothing to repay if we are over the collateralization ratio
         if (currentRatio > collateralizationRatio) {
             return;
@@ -213,6 +213,23 @@ contract Strategy is BaseStrategy {
         uint256 amountToRepay = balanceOfDebt().sub(newDebt);
         uint256 withdrawn = _withdrawFromYVault(amountToRepay);
         _repayInvestmentTokenDebt(withdrawn);
+    }
+
+    function _mintMoreInvestmentToken(uint256 currentRatio) internal {
+        // Make sure we are above the desired collateralization ratio
+        if (currentRatio < collateralizationRatio) {
+            return;
+        }
+
+        // current_debt = collateral_value / current_ratio
+        // we want new_debt > current_debt for the same collateral value
+        // new_debt = current_debt * current_ratio / desired_ratio
+        // and the amount to mint is the difference between current_debt and new_debt
+        uint256 newDebt =
+            balanceOfDebt().mul(currentRatio).div(collateralizationRatio);
+
+        uint256 daiToMint = newDebt.sub(balanceOfDebt());
+        _lockGemAndDraw(0, daiToMint);
     }
 
     function liquidatePosition(uint256 _amountNeeded)

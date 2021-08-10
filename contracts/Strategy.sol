@@ -210,7 +210,7 @@ contract Strategy is BaseStrategy {
         // and the amount to repay is the difference between current_debt and new_debt
         uint256 newDebt =
             balanceOfDebt().mul(currentRatio).div(collateralizationRatio);
-        newDebt = Math.max(newDebt, _debtFloor());
+        newDebt = Math.max(newDebt, _debtFloorWithTreshold());
 
         // We are repaying debt to increase the collateralization ratio, so the new
         // required debt will be less than the original debt
@@ -632,8 +632,8 @@ contract Strategy is BaseStrategy {
         return Math.min(maxMintableDai, desiredAmount);
     }
 
-    // Returns the debt floor in [wad]
-    function _debtFloor() internal returns (uint256) {
+    // Returns the debt floor in [wad] incremented by 10 cents to avoid rounding errors
+    function _debtFloorWithTreshold() internal returns (uint256) {
         VatLike vat = VatLike(cdpManager.vat());
 
         // uint256 Art;   // Total Normalised Debt     [wad]
@@ -642,7 +642,7 @@ contract Strategy is BaseStrategy {
         // uint256 line;  // Debt Ceiling              [rad]
         // uint256 dust;  // Urn Debt Floor            [rad]
         (, , , , uint256 dust) = vat.ilks(ilk);
-        return dust.div(RAY);
+        return dust.div(RAY).add(1e17);
     }
 
     // Returns DAI to decrease debt and attempts to unlock any amount of collateral

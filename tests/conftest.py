@@ -61,6 +61,21 @@ def dai_whale(accounts):
 
 
 @pytest.fixture
+def borrow_token(dai):
+    yield dai
+
+
+@pytest.fixture
+def borrow_whale(dai_whale):
+    yield dai_whale
+
+
+@pytest.fixture
+def yvault(yvDAI):
+    yield yvDAI
+
+
+@pytest.fixture
 def price_oracle_usd():
     chainlink_oracle = interface.AggregatorInterface(
         "0xA027702dbb89fbd58938e4324ac03B58d812b0E1"

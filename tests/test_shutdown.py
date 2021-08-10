@@ -1,7 +1,6 @@
 # TODO: Add tests that show proper operation of this strategy through "emergencyExit"
 #       Make sure to demonstrate the "worst case losses" as well as the time it takes
 
-from brownie import ZERO_ADDRESS
 import pytest
 
 
@@ -14,7 +13,11 @@ def test_vault_shutdown_can_withdraw(
     assert token.balanceOf(vault.address) == amount
 
     if token.balanceOf(user) > 0:
-        token.transfer(ZERO_ADDRESS, token.balanceOf(user), {"from": user})
+        token.transfer(
+            "0x000000000000000000000000000000000000dead",
+            token.balanceOf(user),
+            {"from": user},
+        )
 
     # Harvest 1: Send funds through the strategy
     strategy.harvest()

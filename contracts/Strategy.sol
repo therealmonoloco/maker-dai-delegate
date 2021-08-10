@@ -533,6 +533,10 @@ contract Strategy is BaseStrategy {
     function _lockGemAndDraw(uint256 collateralAmount, uint256 daiToMint)
         internal
     {
+        if (daiToMint > 0) {
+            daiToMint = _forceWithinLimits(daiToMint);
+        }
+
         address urn = cdpManager.urns(cdpId);
         VatLike vat = VatLike(cdpManager.vat());
 
@@ -554,6 +558,42 @@ contract Strategy is BaseStrategy {
 
         // Exits DAI to the user's wallet as a token
         daiJoinAdapter.exit(address(this), daiToMint);
+    }
+
+    function _forceWithinLimits(uint256 desiredAmount)
+        internal
+        returns (uint256)
+    {
+        VatLike vat = VatLike(cdpManager.vat());
+
+        // uint256 Art;   // Total Normalised Debt     [wad]
+        // uint256 rate;  // Accumulated Rates         [ray]
+        // uint256 spot;  // Price with Safety Margin  [ray]
+        // uint256 line;  // Debt Ceiling              [rad]
+        // uint256 dust;  // Urn Debt Floor            [rad]
+        (uint256 Art, uint256 rate, , uint256 line, uint256 dust) =
+            vat.ilks(ilk);
+
+        // Total debt in rad (wad * ray)
+        uint256 vatDebt = Art.mul(rate);
+
+        // If current debt exceeds ceiling then no more DAI is available to mint
+        if (vatDebt > line) {
+            return 0;
+        }
+
+        uint256 maxMintableDai = line.sub(vatDebt);
+
+        // If available debt is below the floor set by `dust` then no more DAI can be minted
+        if (maxMintableDai < dust) {
+            return 0;
+        }
+
+        // Convert max amount of DAI to mint from [rad] to [wad]
+        maxMintableDai = maxMintableDai.div(1e27);
+
+        // Return available debt to be minted
+        return Math.min(maxMintableDai, desiredAmount);
     }
 
     // Returns DAI to decrease debt and attempts to unlock any amount of collateral

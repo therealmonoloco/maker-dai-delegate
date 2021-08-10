@@ -253,6 +253,11 @@ contract Strategy is BaseStrategy {
         uint256 collateralBalance = balanceOfMakerVault();
         uint256 totalDebt = balanceOfDebt();
 
+        // If for some reason we do not have debt, make sure the operation does not revert
+        if (totalDebt == 0) {
+            totalDebt = 1;
+        }
+
         uint256 toFreeIT = amountToFree.mul(price).div(WAD);
         uint256 collateralIT = collateralBalance.mul(price).div(WAD);
         uint256 newRatio = collateralIT.sub(toFreeIT).div(totalDebt);
@@ -277,7 +282,25 @@ contract Strategy is BaseStrategy {
         (_amountFreed, ) = liquidatePosition(estimatedTotalAssets());
     }
 
-    // NOTE: Can override `tendTrigger` and `harvestTrigger` if necessary
+    function tendTrigger(uint256 callCostInWei)
+        public
+        view
+        override
+        returns (bool)
+    {
+        // Nothing to adjust if there is no collateral locked
+        if (balanceOfMakerVault() == 0) {
+            return false;
+        }
+
+        uint256 currentRatio = getCurrentMakerVaultRatio();
+
+        // If we need to repay debt or mint more DAI and are outside the tolerance bands,
+        // we do it regardless of the call cost
+        return
+            (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) ||
+            (currentRatio > collateralizationRatio.add(rebalanceTolerance));
+    }
 
     function prepareMigration(address _newStrategy) internal override {
         // Transfer Maker Vault ownership to the new startegy
@@ -435,6 +458,11 @@ contract Strategy is BaseStrategy {
                 WAD
             );
         uint256 totalDebt = balanceOfDebt();
+
+        // If for some reason we do not have debt, make sure the operation does not revert
+        if (totalDebt == 0) {
+            totalDebt = 1;
+        }
 
         uint256 ratio = totalCollateralValue.mul(100).div(totalDebt);
         return ratio;

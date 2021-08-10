@@ -56,6 +56,11 @@ def dai():
 
 
 @pytest.fixture
+def dai_whale(accounts):
+    yield accounts.at("0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643", force=True)
+
+
+@pytest.fixture
 def price_oracle_usd():
     chainlink_oracle = interface.AggregatorInterface(
         "0xA027702dbb89fbd58938e4324ac03B58d812b0E1"
@@ -73,7 +78,8 @@ def price_oracle_eth():
 
 @pytest.fixture
 def yvDAI():
-    yield interface.IVault("0xdA816459F1AB5631232FE5e97a05BBBb94970c95")
+    vault_address = "0xdA816459F1AB5631232FE5e97a05BBBb94970c95"
+    yield Contract(vault_address)
 
 
 @pytest.fixture
@@ -93,10 +99,10 @@ def weth():
 
 
 @pytest.fixture
-def weth_amout(user, weth):
-    weth_amout = 10 ** weth.decimals()
-    user.transfer(weth, weth_amout)
-    yield weth_amout
+def weth_amount(user, weth):
+    weth_amount = 10 ** weth.decimals()
+    user.transfer(weth, weth_amount)
+    yield weth_amount
 
 
 @pytest.fixture

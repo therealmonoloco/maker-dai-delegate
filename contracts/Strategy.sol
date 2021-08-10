@@ -240,11 +240,27 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
-        // TODO: Do stuff here to free up to `_amountNeeded` from all positions back into `want`
-        // NOTE: Maintain invariant `want.balanceOf(this) >= _liquidatedAmount`
-        // NOTE: Maintain invariant `_liquidatedAmount + _loss <= _amountNeeded`
+        uint256 balance = balanceOfWant();
+        // Can we handle it without liquidating positions?
+        if (balance >= _amountNeeded) {
+            return (_amountNeeded, 0);
+        }
 
-        uint256 totalAssets = want.balanceOf(address(this));
+        // We only need to free the amount of want not readily available
+        uint256 amountToFree = _amountNeeded.sub(balance);
+
+        uint256 price = _getWantTokenPrice();
+        uint256 collateralBalance = balanceOfMakerVault();
+        uint256 totalDebt = balanceOfDebt();
+
+        uint256 toFreeIT = amountToFree.mul(price).div(WAD);
+        uint256 collateralIT = collateralBalance.mul(price).div(WAD);
+        uint256 newRatio = collateralIT.sub(toFreeIT).div(totalDebt);
+
+        _repayDebt(newRatio);
+        _wipeAndFreeGem(amountToFree, 0);
+
+        uint256 totalAssets = balanceOfWant();
         if (_amountNeeded > totalAssets) {
             _liquidatedAmount = totalAssets;
             _loss = _amountNeeded.sub(totalAssets);

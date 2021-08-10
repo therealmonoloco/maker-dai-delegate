@@ -391,7 +391,7 @@ contract Strategy is BaseStrategy {
         // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %)
         // and multiply by 100 to correct the offset
         uint256 daiToMint =
-            amount.mul(price).div(WAD).div(collateralizationRatio).mul(100);
+            amount.mul(price).mul(100).div(WAD).div(collateralizationRatio);
 
         // Lock collateral and mint DAI
         _lockGemAndDraw(amount, daiToMint);

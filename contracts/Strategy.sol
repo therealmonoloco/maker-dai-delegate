@@ -564,7 +564,11 @@ contract Strategy is BaseStrategy {
         internal
     {
         if (daiToMint > 0) {
-            daiToMint = _forceWithinLimits(daiToMint);
+            daiToMint = _forceMintWithinLimits(daiToMint);
+        }
+
+        if (collateralAmount == 0 && daiToMint == 0) {
+            return;
         }
 
         address urn = cdpManager.urns(cdpId);
@@ -590,7 +594,7 @@ contract Strategy is BaseStrategy {
         daiJoinAdapter.exit(address(this), daiToMint);
     }
 
-    function _forceWithinLimits(uint256 desiredAmount)
+    function _forceMintWithinLimits(uint256 desiredAmount)
         internal
         returns (uint256)
     {

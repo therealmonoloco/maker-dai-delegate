@@ -447,7 +447,9 @@ contract Strategy is BaseStrategy {
 
         // spot: collateral price with safety margin returned in ray (10**27)
         (, , uint256 spot, , ) = vat.ilks(ilk);
-        spot = toWad(spot);
+
+        // Convert spot from [ray] to [wad]
+        spot = spot.div(1e9);
 
         // Liquidation ratio for the given ilk
         // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
@@ -578,8 +580,8 @@ contract Strategy is BaseStrategy {
             _getDrawDart(vat, urn, daiToMint)
         );
 
-        // Moves the DAI amount (balance in the vat in rad) to the strategy
-        cdpManager.move(cdpId, address(this), toRad(daiToMint));
+        // Moves the DAI amount to the strategy. Need to convert dai from [wad] to [rad]
+        cdpManager.move(cdpId, address(this), daiToMint.mul(1e27));
 
         // Allow access to DAI balance in the vat
         vat.hope(address(daiJoinAdapter));
@@ -700,13 +702,5 @@ contract Strategy is BaseStrategy {
 
     function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
         require((z = x - y) <= x, "sub-overflow");
-    }
-
-    function toRad(uint256 wad) internal pure returns (uint256 rad) {
-        rad = mul(wad, 10**27);
-    }
-
-    function toWad(uint256 ray) internal pure returns (uint256 wad) {
-        wad = ray.div(10**9);
     }
 }

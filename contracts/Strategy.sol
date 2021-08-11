@@ -748,7 +748,7 @@ contract Strategy is BaseStrategy {
         // Locks token amount into the CDP and generates debt
         cdpManager.frob(
             cdpId,
-            toInt(collateralAmount),
+            int256(collateralAmount),
             _getDrawDart(vat, urn, daiToMint)
         );
 
@@ -823,7 +823,7 @@ contract Strategy is BaseStrategy {
         // Paybacks debt to the CDP and unlocks token amount from it
         cdpManager.frob(
             cdpId,
-            -toInt(collateralAmount),
+            -int256(collateralAmount),
             _getWipeDart(
                 cdpManager.vat(),
                 VatLike(cdpManager.vat()).dai(urn),
@@ -852,7 +852,7 @@ contract Strategy is BaseStrategy {
         // If there was already enough DAI in the vat balance, just exits it without adding more debt
         if (dai < mul(wad, RAY)) {
             // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
-            dart = toInt(sub(mul(wad, RAY), dai) / rate);
+            dart = int256(sub(mul(wad, RAY), dai) / rate);
             // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
             dart = mul(uint256(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
         }
@@ -870,14 +870,9 @@ contract Strategy is BaseStrategy {
         (, uint256 art) = VatLike(vat).urns(ilk, urn);
 
         // Uses the whole dai balance in the vat to reduce the debt
-        dart = toInt(dai / rate);
+        dart = int256(dai / rate);
         // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
-        dart = uint256(dart) <= art ? -dart : -toInt(art);
-    }
-
-    function toInt(uint256 x) internal pure returns (int256 y) {
-        y = int256(x);
-        require(y >= 0, "int-overflow");
+        dart = uint256(dart) <= art ? -dart : -int256(art);
     }
 
     function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {

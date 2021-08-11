@@ -61,8 +61,7 @@ contract Strategy is BaseStrategy {
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     // SushiSwap router
-    ISwap internal constant router =
-        ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+    ISwap public router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
     // TODO: ilk, join adapter and chainlink oracle should be dynamic to support different ilks
     bytes32 public ilk = "YFI-A";
@@ -92,11 +91,40 @@ contract Strategy is BaseStrategy {
         rebalanceTolerance = 5;
     }
 
+    // ----------------- SETTERS -----------------
+
+    // Target collateralization ratio to main within bounds
+    function setCollateralizationRatio(uint256 _collateralizationRatio)
+        external
+        onlyEmergencyAuthorized
+    {
+        collateralizationRatio = _collateralizationRatio;
+    }
+
+    // Rebalancing bands (collat ratio - tolerance, collat_ratio )
+    function setRebalanceTolerance(uint256 _rebalanceTolerance)
+        external
+        onlyEmergencyAuthorized
+    {
+        rebalanceTolerance = _rebalanceTolerance;
+    }
+
+    // Max slippage to accept when withdrawing from yVault
+    function setMaxLoss(uint256 _maxLoss) external onlyEmergencyAuthorized {
+        maxLoss = _maxLoss;
+    }
+
     // Required to move funds to a new cdp and use a different cdpId after migration.
-    // Should only be called by governance.
+    // Should only be called by governance as it will decide fund allocation
     function shiftToCdp(uint256 newCdpId) external onlyGovernance {
         cdpManager.shift(cdpId, newCdpId);
         cdpId = newCdpId;
+    }
+
+    // Where to route token swaps, must conform to ISwap interface
+    // Access control is stricter in this method as it will be sent funds
+    function setSwapRouter(ISwap _router) external onlyGovernance {
+        router = _router;
     }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************

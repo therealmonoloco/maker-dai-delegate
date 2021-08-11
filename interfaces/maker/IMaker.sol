@@ -151,3 +151,7 @@ interface SpotLike {
 
     function ilks(bytes32) external view returns (address, uint256);
 }
+
+interface DssAutoLine {
+    function exec(bytes32 _ilk) external returns (uint256);
+}

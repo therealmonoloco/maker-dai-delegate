@@ -61,4 +61,10 @@ jobs:
       env:
         ETHERSCAN_TOKEN: MW5CQA6QK5YMJXP2WP3RA36HM5A7RA1IHA
         WEB3_INFURA_PROJECT_ID: b7821200399e4be2b4e5dbdf06fbe85b
-      run: brownie test
+      run: |
+        brownie test tests/test_cdp_setup.py -s
+        brownie test tests/test_direct_transfer.py -s
+        brownie test tests/test_migration.py -s
+        brownie test tests/test_operation.py -s
+        brownie test tests/test_revoke.py -s
+        brownie test tests/test_shutdown.py -s

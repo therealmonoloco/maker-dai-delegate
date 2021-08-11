@@ -3,6 +3,8 @@
 
 import pytest
 
+from brownie import Wei
+
 
 def test_vault_shutdown_can_withdraw(
     chain, token, vault, strategy, user, amount, RELATIVE_APPROX
@@ -35,7 +37,17 @@ def test_vault_shutdown_can_withdraw(
 
 
 def test_basic_shutdown(
-    chain, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
+    chain,
+    token,
+    vault,
+    strategy,
+    user,
+    strategist,
+    amount,
+    yvDAI,
+    dai,
+    dai_whale,
+    RELATIVE_APPROX,
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -50,6 +62,9 @@ def test_basic_shutdown(
     ## Earn interest
     chain.sleep(3600 * 24 * 1)  ## Sleep 1 day
     chain.mine(1)
+
+    # Send some profit to yVault
+    dai.transfer(yvDAI, Wei("20_000 ether"), {"from": dai_whale})
 
     # Harvest 2: Realize profit
     strategy.harvest()

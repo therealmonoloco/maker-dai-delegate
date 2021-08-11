@@ -36,14 +36,3 @@ def test_migration(
     )
     assert new_strategy.cdpId() == orig_cdp_id
     assert vault.strategies(new_strategy).dict()["totalDebt"] == amount
-
-
-def test_gov_can_shift_cdp(strategy, gov):
-    # cdp-not-allowed should be the revert msg since we are shifting to a random cdp
-    with reverts("cdp-not-allowed"):
-        strategy.shiftToCdp(123, {"from": gov})
-
-
-def test_non_gov_cannot_shift_cdp(strategy, user):
-    with reverts("!authorized"):
-        strategy.shiftToCdp(123, {"from": user})

@@ -2,10 +2,7 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import {
-    BaseStrategy,
-    StrategyParams
-} from "@yearnvaults/contracts/BaseStrategy.sol";
+import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import {
     SafeERC20,
@@ -283,7 +280,12 @@ contract Strategy is BaseStrategy {
         // or leave at least 'dust' balance (10,000 DAI for YFI-A)
         uint256 debtFloor = _debtFloor();
         if (newDebt <= debtFloor) {
-            if (_valueOfInvestment() >= currentDebt) {
+            // If we sold want to repay debt we will have DAI readily available in the strategy
+            // This means we need to count both yvDAI shares and current DAI balance
+            uint256 totalInvestmentAvailableToRepay =
+                _valueOfInvestment().add(balanceOfInvestmentToken());
+
+            if (totalInvestmentAvailableToRepay >= currentDebt) {
                 // Pay the entire debt if we have enough investment token
                 amountToRepay = currentDebt;
             } else {
@@ -296,6 +298,8 @@ contract Strategy is BaseStrategy {
             amountToRepay = currentDebt.sub(newDebt);
         }
 
+        // Does not matter if amountToRepay exceeds yVault's strategy balance
+        // as it happens in the case where we sold want for DAI
         uint256 withdrawn = _withdrawFromYVault(amountToRepay);
         _repayInvestmentTokenDebt(withdrawn);
     }
@@ -334,6 +338,10 @@ contract Strategy is BaseStrategy {
 
         uint256 price = _getWantTokenPrice();
         uint256 collateralBalance = balanceOfMakerVault();
+
+        // We cannot free more than what we have locked
+        amountToFree = Math.min(amountToFree, collateralBalance);
+
         uint256 totalDebt = balanceOfDebt();
 
         // If for some reason we do not have debt, make sure the operation does not revert
@@ -361,6 +369,13 @@ contract Strategy is BaseStrategy {
                 uint256 currentInvestmentValue = _valueOfInvestment();
                 uint256 investmentLeftToAcquire =
                     balanceOfDebt().sub(currentInvestmentValue);
+
+                // Very small numbers may round to 0 'want' to use for buying investment token
+                // Enforce a minimum of $1 to swap in order to avoid this
+                investmentLeftToAcquire = Math.max(
+                    investmentLeftToAcquire,
+                    1e18
+                );
 
                 uint256 investmentLeftToAcquireInWant =
                     investmentLeftToAcquire.mul(WAD).div(price);
@@ -398,12 +413,11 @@ contract Strategy is BaseStrategy {
 
         uint256 price = _getWantTokenPrice();
 
-        // Total collateral in investment token
-        uint256 collateralIT = totalCollateral.mul(price).div(WAD);
-
         // Min collateral in want that needs to be locked with the outstanding debt
         uint256 minCollateral =
-            collateralizationRatio.mul(totalDebt).div(price).div(MAX_BPS);
+            collateralizationRatio.mul(totalDebt).mul(WAD).div(price).div(
+                MAX_BPS
+            );
 
         // If we are under collateralized then it is not safe for us to withdraw anything
         if (minCollateral > totalCollateral) {

@@ -1,5 +1,5 @@
 import pytest
-from brownie import config
+from brownie import config, interface
 from brownie import Contract
 
 
@@ -40,16 +40,69 @@ def keeper(accounts):
 
 @pytest.fixture
 def token():
-    token_address = "0x6b175474e89094c44da98b954eedeac495271d0f"  # this should be the address of the ERC-20 used by the strategy/vault (DAI)
+    token_address = "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e"  # YFI
     yield Contract(token_address)
 
 
 @pytest.fixture
+def token_whale(accounts):
+    yield accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
+
+
+@pytest.fixture
+def dai():
+    dai_address = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    yield Contract(dai_address)
+
+
+@pytest.fixture
+def dai_whale(accounts):
+    yield accounts.at("0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643", force=True)
+
+
+@pytest.fixture
+def borrow_token(dai):
+    yield dai
+
+
+@pytest.fixture
+def borrow_whale(dai_whale):
+    yield dai_whale
+
+
+@pytest.fixture
+def yvault(yvDAI):
+    yield yvDAI
+
+
+@pytest.fixture
+def price_oracle_usd():
+    chainlink_oracle = interface.AggregatorInterface(
+        "0xA027702dbb89fbd58938e4324ac03B58d812b0E1"
+    )
+    yield chainlink_oracle
+
+
+@pytest.fixture
+def price_oracle_eth():
+    chainlink_oracle = interface.AggregatorInterface(
+        "0x7c5d4F8345e66f68099581Db340cd65B078C41f4"
+    )
+    yield chainlink_oracle
+
+
+@pytest.fixture
+def yvDAI():
+    vault_address = "0xdA816459F1AB5631232FE5e97a05BBBb94970c95"
+    yield Contract(vault_address)
+
+
+@pytest.fixture
 def amount(accounts, token, user):
-    amount = 10_000 * 10 ** token.decimals()
+    amount = 10 * 10 ** token.decimals()
     # In order to get some funds for the token you are about to use,
     # it impersonate an exchange address to use it's funds.
-    reserve = accounts.at("0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643", force=True)
+    reserve = accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
     token.transfer(user, amount, {"from": reserve})
     yield amount
 
@@ -61,10 +114,10 @@ def weth():
 
 
 @pytest.fixture
-def weth_amout(user, weth):
-    weth_amout = 10 ** weth.decimals()
-    user.transfer(weth, weth_amout)
-    yield weth_amout
+def weth_amount(user, weth):
+    weth_amount = 10 ** weth.decimals()
+    user.transfer(weth, weth_amount)
+    yield weth_amount
 
 
 @pytest.fixture

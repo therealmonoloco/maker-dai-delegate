@@ -1,8 +1,6 @@
-# TODO: Add tests that show proper migration of the strategy to a newer one
-#       Use another copy of the strategy to simulate the migration
-#       Show that nothing is lost!
-
 import pytest
+
+from brownie import Wei, reverts
 
 
 def test_migration(
@@ -27,7 +25,25 @@ def test_migration(
     # migrate to a new strategy
     new_strategy = strategist.deploy(Strategy, vault)
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+
+    orig_cdp_id = strategy.cdpId()
+    new_strategy.shiftToCdp(orig_cdp_id, {"from": gov})
+    new_strategy.harvest({"from": gov})
+
     assert (
         pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
         == amount
     )
+    assert new_strategy.cdpId() == orig_cdp_id
+    assert vault.strategies(new_strategy).dict()["totalDebt"] == amount
+
+
+def test_gov_can_shift_cdp(strategy, gov):
+    # cdp-not-allowed should be the revert msg since we are shifting to a random cdp
+    with reverts("cdp-not-allowed"):
+        strategy.shiftToCdp(123, {"from": gov})
+
+
+def test_non_gov_cannot_shift_cdp(strategy, user):
+    with reverts("!authorized"):
+        strategy.shiftToCdp(123, {"from": user})

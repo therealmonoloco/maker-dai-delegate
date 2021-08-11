@@ -1,11 +1,9 @@
-import brownie
-from brownie import Contract
 import pytest
 
+from brownie import reverts
 
-def test_operation(
-    chain, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
-):
+
+def test_operation(chain, token, vault, strategy, user, amount, RELATIVE_APPROX):
     # Deposit to the vault
     user_balance_before = token.balanceOf(user)
     token.approve(vault.address, amount, {"from": user})
@@ -27,9 +25,7 @@ def test_operation(
     )
 
 
-def test_emergency_exit(
-    chain, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
-):
+def test_emergency_exit(chain, token, vault, strategy, user, amount, RELATIVE_APPROX):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -45,7 +41,7 @@ def test_emergency_exit(
 
 
 def test_profitable_harvest(
-    chain, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
+    chain, token, vault, yvDAI, dai, dai_whale, strategy, user, amount, RELATIVE_APPROX
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -57,22 +53,27 @@ def test_profitable_harvest(
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
-    # TODO: Add some code before harvest #2 to simulate earning yield
+    # Sleep for 60 days
+    chain.sleep(60 * 24 * 3600)
+    chain.mine(1)
+
+    # Simulate profit in yVault
+    before_pps = vault.pricePerShare()
+    dai.transfer(yvDAI, yvDAI.totalAssets() * 1.05, {"from": dai_whale})
 
     # Harvest 2: Realize profit
-    chain.sleep(1)
     strategy.harvest()
+
     chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
     chain.mine(1)
     profit = token.balanceOf(vault.address)  # Profits go to vault
-    # TODO: Uncomment the lines below
-    # assert token.balanceOf(strategy) + profit > amount
-    # assert vault.pricePerShare() > before_pps
+
+    assert strategy.estimatedTotalAssets() + profit > amount
+    assert vault.pricePerShare() > before_pps
+    assert vault.totalAssets() > amount
 
 
-def test_change_debt(
-    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
-):
+def test_change_debt(chain, gov, token, vault, strategy, user, amount, RELATIVE_APPROX):
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -88,42 +89,44 @@ def test_change_debt(
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
-    # In order to pass this tests, you will need to implement prepareReturn.
-    # TODO: uncomment the following lines.
-    # vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
-    # chain.sleep(1)
-    # strategy.harvest()
-    # assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
+    vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
 
 
-def test_sweep(gov, vault, strategy, token, user, amount, weth, weth_amout):
+def test_sweep(
+    gov, vault, strategy, token, user, amount, weth, weth_amount, yvDAI, dai
+):
     # Strategy want token doesn't work
     token.transfer(strategy, amount, {"from": user})
     assert token.address == strategy.want()
     assert token.balanceOf(strategy) > 0
-    with brownie.reverts("!want"):
+    with reverts("!want"):
         strategy.sweep(token, {"from": gov})
 
     # Vault share token doesn't work
-    with brownie.reverts("!shares"):
+    with reverts("!shares"):
         strategy.sweep(vault.address, {"from": gov})
 
-    # TODO: If you add protected tokens to the strategy.
     # Protected token doesn't work
-    # with brownie.reverts("!protected"):
-    #     strategy.sweep(strategy.protectedToken(), {"from": gov})
+    with reverts("!protected"):
+        # Dai is protected
+        strategy.sweep(dai, {"from": gov})
+
+    with reverts("!protected"):
+        # yvDai is protected
+        strategy.sweep(yvDAI, {"from": gov})
 
     before_balance = weth.balanceOf(gov)
-    weth.transfer(strategy, weth_amout, {"from": user})
+    weth.transfer(strategy, weth_amount, {"from": user})
     assert weth.address != strategy.want()
     assert weth.balanceOf(user) == 0
     strategy.sweep(weth, {"from": gov})
-    assert weth.balanceOf(gov) == weth_amout + before_balance
+    assert weth.balanceOf(gov) == weth_amount + before_balance
 
 
-def test_triggers(
-    chain, gov, vault, strategy, token, amount, user, weth, weth_amout, strategist
-):
+def test_triggers(chain, gov, vault, strategy, token, amount, user):
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})

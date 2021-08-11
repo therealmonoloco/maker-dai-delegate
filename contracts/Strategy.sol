@@ -67,6 +67,9 @@ contract Strategy is BaseStrategy {
     // DAI token
     IERC20 internal investmentToken;
 
+    // 100%
+    uint256 internal constant MAX_BPS = 100;
+
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
@@ -88,6 +91,9 @@ contract Strategy is BaseStrategy {
     // Maximum acceptable lost on withdrawal. Default to 0.01%.
     uint256 public maxLoss = 1;
 
+    // If set to true the strategy will never try to repay debt by selling want
+    bool public leaveDebtBehind;
+
     constructor(address _vault) public BaseStrategy(_vault) {
         investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
@@ -97,6 +103,9 @@ contract Strategy is BaseStrategy {
 
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
         rebalanceTolerance = 5;
+
+        // If we lose money in yvDAI then we are OK selling want to repay it
+        leaveDebtBehind = false;
     }
 
     // ----------------- SETTERS -----------------
@@ -120,6 +129,14 @@ contract Strategy is BaseStrategy {
     // Max slippage to accept when withdrawing from yVault
     function setMaxLoss(uint256 _maxLoss) external onlyEmergencyAuthorized {
         maxLoss = _maxLoss;
+    }
+
+    // Max slippage to accept when withdrawing from yVault
+    function setLeaveDebtBehind(bool _leaveDebtBehind)
+        external
+        onlyEmergencyAuthorized
+    {
+        leaveDebtBehind = _leaveDebtBehind;
     }
 
     // Required to move funds to a new cdp and use a different cdpId after migration.
@@ -306,6 +323,7 @@ contract Strategy is BaseStrategy {
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
         uint256 balance = balanceOfWant();
+
         // Can we handle it without liquidating positions?
         if (balance >= _amountNeeded) {
             return (_amountNeeded, 0);
@@ -327,8 +345,34 @@ contract Strategy is BaseStrategy {
         uint256 collateralIT = collateralBalance.mul(price).div(WAD);
         uint256 newRatio = collateralIT.sub(toFreeIT).div(totalDebt);
 
+        // Attempt to repay necessary debt to restore the target collateralization ratio
         _repayDebt(newRatio);
-        _wipeAndFreeGem(amountToFree, 0);
+
+        // If we are liquidating all positions and were not able to pay the debt in full,
+        // we may need to unlock some collateral to sell
+        if (newRatio == 0 && balanceOfDebt() > 0) {
+            // Unlock as much collateral as possible while keeping the target ratio
+            _wipeAndFreeGem(_maxWithdrawal(), 0);
+
+            // If we do not intend to leave debt behind, then we calculate the amount of
+            // want to sell and exchange it for the investment token in order to repay
+            // the debt in full
+            if (!leaveDebtBehind) {
+                uint256 currentInvestmentValue = _valueOfInvestment();
+                uint256 investmentLeftToAcquire =
+                    balanceOfDebt().sub(currentInvestmentValue);
+
+                uint256 investmentLeftToAcquireInWant =
+                    investmentLeftToAcquire.mul(WAD).div(price);
+
+                if (investmentLeftToAcquireInWant < balanceOfWant()) {
+                    _buyInvestmentTokenWithWant(investmentLeftToAcquireInWant);
+                    _repayDebt(0);
+                }
+            }
+        } else {
+            _wipeAndFreeGem(amountToFree, 0);
+        }
 
         uint256 totalAssets = balanceOfWant();
         if (_amountNeeded > totalAssets) {
@@ -337,6 +381,36 @@ contract Strategy is BaseStrategy {
         } else {
             _liquidatedAmount = _amountNeeded;
         }
+    }
+
+    // Returns maximum collateral to withdraw while maintaining the target collateralization ratio
+    function _maxWithdrawal() internal view returns (uint256) {
+        // Denominated in want
+        uint256 totalCollateral = balanceOfMakerVault();
+
+        // Denominated in investment token
+        uint256 totalDebt = balanceOfDebt();
+
+        // If there is no debt to repay we can withdraw all the locked collateral
+        if (totalDebt == 0) {
+            return totalCollateral;
+        }
+
+        uint256 price = _getWantTokenPrice();
+
+        // Total collateral in investment token
+        uint256 collateralIT = totalCollateral.mul(price).div(WAD);
+
+        // Min collateral in want that needs to be locked with the outstanding debt
+        uint256 minCollateral =
+            collateralizationRatio.mul(totalDebt).div(price).div(MAX_BPS);
+
+        // If we are under collateralized then it is not safe for us to withdraw anything
+        if (minCollateral > totalCollateral) {
+            return 0;
+        }
+
+        return totalCollateral.sub(minCollateral);
     }
 
     function liquidateAllPositions()
@@ -495,7 +569,7 @@ contract Strategy is BaseStrategy {
         // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %)
         // and multiply by 100 to correct the offset
         uint256 daiToMint =
-            amount.mul(price).mul(100).div(WAD).div(collateralizationRatio);
+            amount.mul(price).mul(MAX_BPS).div(WAD).div(collateralizationRatio);
 
         // Lock collateral and mint DAI
         _lockGemAndDraw(amount, daiToMint);
@@ -531,7 +605,7 @@ contract Strategy is BaseStrategy {
             totalDebt = 1;
         }
 
-        uint256 ratio = totalCollateralValue.mul(100).div(totalDebt);
+        uint256 ratio = totalCollateralValue.mul(MAX_BPS).div(totalDebt);
         return ratio;
     }
 
@@ -616,6 +690,21 @@ contract Strategy is BaseStrategy {
             _amount,
             0,
             getTokenOutPath(tokenA, tokenB),
+            address(this),
+            now
+        );
+    }
+
+    function _buyInvestmentTokenWithWant(uint256 _amount) internal {
+        if (_amount == 0 || address(investmentToken) == address(want)) {
+            return;
+        }
+
+        _checkAllowance(address(router), address(want), _amount);
+        router.swapTokensForExactTokens(
+            _amount,
+            type(uint256).max,
+            getTokenOutPath(address(want), address(investmentToken)),
             address(this),
             now
         );

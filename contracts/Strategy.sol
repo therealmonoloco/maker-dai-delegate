@@ -138,7 +138,6 @@ contract Strategy is BaseStrategy {
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {
-        // TODO: should be dynamic to support different ilks
         return "StrategyMakerYFI";
     }
 

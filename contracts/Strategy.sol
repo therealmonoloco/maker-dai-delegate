@@ -208,13 +208,29 @@ contract Strategy is BaseStrategy {
         // so that new_debt * desired_ratio = current_debt * current_ratio
         // new_debt = current_debt * current_ratio / desired_ratio
         // and the amount to repay is the difference between current_debt and new_debt
+        uint256 currentDebt = balanceOfDebt();
         uint256 newDebt =
-            balanceOfDebt().mul(currentRatio).div(collateralizationRatio);
-        newDebt = Math.max(newDebt, _debtFloorWithTreshold());
+            currentDebt.mul(currentRatio).div(collateralizationRatio);
 
-        // We are repaying debt to increase the collateralization ratio, so the new
-        // required debt will be less than the original debt
-        uint256 amountToRepay = balanceOfDebt().sub(newDebt);
+        uint256 amountToRepay;
+
+        // Maker will revert if the outstanding debt is less than a debt floor
+        // called 'dust'. If we are there we need to either pay the debt in full
+        // or leave at least 'dust' balance (10,000 DAI for YFI-A)
+        uint256 debtFloor = _debtFloor();
+        if (newDebt <= debtFloor) {
+            if (_valueOfInvestment() >= currentDebt) {
+                // Pay the entire debt if we have enough investment token
+                amountToRepay = currentDebt;
+            } else {
+                // Pay just 0.1 cent above debtFloor (best effort without liquidating want)
+                amountToRepay = currentDebt.sub(debtFloor).sub(1e15);
+            }
+        } else {
+            // If we are not near the debt floor then just pay the exact amount
+            // needed to obtain a healthy collateralization ratio
+            amountToRepay = currentDebt.sub(newDebt);
+        }
 
         uint256 withdrawn = _withdrawFromYVault(amountToRepay);
         _repayInvestmentTokenDebt(withdrawn);
@@ -632,8 +648,7 @@ contract Strategy is BaseStrategy {
         return Math.min(maxMintableDai, desiredAmount);
     }
 
-    // Returns the debt floor in [wad] incremented by 10 cents to avoid rounding errors
-    function _debtFloorWithTreshold() internal returns (uint256) {
+    function _debtFloor() internal returns (uint256) {
         VatLike vat = VatLike(cdpManager.vat());
 
         // uint256 Art;   // Total Normalised Debt     [wad]
@@ -642,7 +657,7 @@ contract Strategy is BaseStrategy {
         // uint256 line;  // Debt Ceiling              [rad]
         // uint256 dust;  // Urn Debt Floor            [rad]
         (, , , , uint256 dust) = vat.ilks(ilk);
-        return dust.div(RAY).add(1e17);
+        return dust.div(RAY);
     }
 
     // Returns DAI to decrease debt and attempts to unlock any amount of collateral

@@ -98,6 +98,12 @@ def yvDAI():
 
 
 @pytest.fixture
+def router():
+    sushiswap_router = interface.ISwap("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
+    yield sushiswap_router
+
+
+@pytest.fixture
 def amount(accounts, token, user):
     amount = 10 * 10 ** token.decimals()
     # In order to get some funds for the token you are about to use,

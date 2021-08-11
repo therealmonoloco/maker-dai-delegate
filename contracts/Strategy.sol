@@ -24,22 +24,28 @@ contract Strategy is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
+    // Units used in Maker contracts
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
     uint256 internal constant RAD = 10**45;
 
+    // Maker vaults manager
     ManagerLike internal constant cdpManager =
         ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
 
-    DaiJoinLike internal constant daiJoinAdapter =
-        DaiJoinLike(0x9759A6Ac90977b93B58547b4A71c78317f391A28);
-
+    // Part of the Maker Rates Module in charge of accumulating stability fees
     JugLike internal constant jug =
         JugLike(0x19c0976f590D67707E62397C87829d896Dc0f1F1);
 
+    // Token Adapter Module for collateral
+    DaiJoinLike internal constant daiJoinAdapter =
+        DaiJoinLike(0x9759A6Ac90977b93B58547b4A71c78317f391A28);
+
+    // Token Adapter Module for collateral
     GemJoinLike internal constant gemJoinAdapter =
         GemJoinLike(0x3ff33d9162aD47660083D7DC4bC02Fb231c81677);
 
+    // Liaison between oracles and core Maker contracts
     SpotLike internal constant spotter =
         SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
 
@@ -63,7 +69,7 @@ contract Strategy is BaseStrategy {
     // SushiSwap router
     ISwap public router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
-    // TODO: ilk, join adapter and chainlink oracle should be dynamic to support different ilks
+    // Collateral type
     bytes32 public ilk = "YFI-A";
 
     // Our vault identifier
@@ -79,14 +85,12 @@ contract Strategy is BaseStrategy {
     uint256 public maxLoss = 1;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        // You can set these parameters on deployment to whatever you want
-        // maxReportDelay = 6300;
-        // profitFactor = 100;
-        // debtThreshold = 0;
         investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
+
         // Minimum collaterization ratio on YFI-A is 175%. Use 250% as target.
         collateralizationRatio = 250;
+
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
         rebalanceTolerance = 5;
     }

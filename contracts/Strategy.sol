@@ -56,10 +56,6 @@ contract Strategy is BaseStrategy {
     OracleSecurityModule public constant YFItoUSDOSM =
         OracleSecurityModule(0x5F122465bCf86F45922036970Be6DD7F58820214);
 
-    // Use Chainlink oracle to obtain latest YFI/USD price
-    AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
-        AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
-
     // Use Chainlink oracle to obtain latest YFI/ETH price
     AggregatorInterface internal constant chainlinkYFItoETHPriceFeed =
         AggregatorInterface(0x7c5d4F8345e66f68099581Db340cd65B078C41f4);
@@ -576,21 +572,11 @@ contract Strategy is BaseStrategy {
 
     function _getWantTokenPrice() internal view returns (uint256) {
         // Attempt to read worst possible price from Maker's Oracle Security Module
-        if (
-            YFItoUSDOSM.bud(address(YFItoUSDOSMProxy)) &&
-            YFItoUSDOSMProxy.users(address(this))
-        ) {
-            (uint256 current, bool has) = YFItoUSDOSMProxy.peek();
-            (uint256 future, ) = YFItoUSDOSMProxy.peep();
-            if (has) {
-                return future < current ? future : current;
-            }
-        }
-
-        // If no price is available or we are not whitelisted, use Chainlink as a fallback
-        int256 price = chainlinkYFItoUSDPriceFeed.latestAnswer();
-        // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
-        return uint256(price * 1e10);
+        // Assume white-listed
+        (uint256 current, bool isCurrentValid) = YFItoUSDOSMProxy.peek();
+        (uint256 future, bool isFutureValid) = YFItoUSDOSMProxy.peep();
+        require(isCurrentValid && isFutureValid);
+        return future < current ? future : current;
     }
 
     function _depositToMakerVault(uint256 amount) internal {

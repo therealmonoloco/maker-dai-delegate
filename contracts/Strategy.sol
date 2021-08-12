@@ -765,7 +765,7 @@ contract Strategy is BaseStrategy {
         cdpManager.frob(
             cdpId,
             int256(collateralAmount),
-            _getDrawDart(vat, urn, daiToMint)
+            _getDrawDart(urn, daiToMint)
         );
 
         // Moves the DAI amount to the strategy. Need to convert dai from [wad] to [rad]
@@ -836,11 +836,7 @@ contract Strategy is BaseStrategy {
         cdpManager.frob(
             cdpId,
             -int256(collateralAmount),
-            _getWipeDart(
-                cdpManager.vat(),
-                VatLike(cdpManager.vat()).dai(urn),
-                urn
-            )
+            _getWipeDart(vat.dai(urn), urn)
         );
         // Moves the amount from the CDP urn to proxy's address
         cdpManager.flux(cdpId, address(this), collateralAmount);
@@ -850,11 +846,10 @@ contract Strategy is BaseStrategy {
     }
 
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L161
-    function _getDrawDart(
-        VatLike vat,
-        address urn,
-        uint256 wad
-    ) internal returns (int256 dart) {
+    function _getDrawDart(address urn, uint256 wad)
+        internal
+        returns (int256 dart)
+    {
         // Updates stability fee rate
         uint256 rate = jug.drip(ilk);
 
@@ -871,15 +866,15 @@ contract Strategy is BaseStrategy {
     }
 
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L183
-    function _getWipeDart(
-        address vat,
-        uint256 dai,
-        address urn
-    ) internal view returns (int256 dart) {
+    function _getWipeDart(uint256 dai, address urn)
+        internal
+        view
+        returns (int256 dart)
+    {
         // Gets actual rate from the vat
-        (, uint256 rate, , , ) = VatLike(vat).ilks(ilk);
+        (, uint256 rate, , , ) = vat.ilks(ilk);
         // Gets actual art value of the urn
-        (, uint256 art) = VatLike(vat).urns(ilk, urn);
+        (, uint256 art) = vat.urns(ilk, urn);
 
         // Uses the whole dai balance in the vat to reduce the debt
         dart = int256(dai / rate);

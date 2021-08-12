@@ -305,10 +305,15 @@ contract Strategy is BaseStrategy {
             amountToRepay = currentDebt.sub(newDebt);
         }
 
-        // Does not matter if amountToRepay exceeds yVault's strategy balance
-        // as it happens in the case where we sold want for DAI
-        uint256 withdrawn = _withdrawFromYVault(amountToRepay);
-        _repayInvestmentTokenDebt(withdrawn);
+        // Pay one extra wei to prevent Vat/dust reverts
+        // FIXME: Better alternative?
+        amountToRepay = amountToRepay.add(1);
+
+        uint256 balanceIT = balanceOfInvestmentToken();
+        if (amountToRepay > balanceIT) {
+            _withdrawFromYVault(amountToRepay.sub(balanceIT));
+        }
+        _repayInvestmentTokenDebt(amountToRepay);
     }
 
     function _mintMoreInvestmentToken(uint256 currentRatio) internal {

@@ -59,7 +59,7 @@ def test_profitable_harvest(
 
     # Simulate profit in yVault
     before_pps = vault.pricePerShare()
-    dai.transfer(yvDAI, yvDAI.totalAssets() * 1.05, {"from": dai_whale})
+    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.05, {"from": dai_whale})
 
     # Harvest 2: Realize profit
     strategy.harvest()

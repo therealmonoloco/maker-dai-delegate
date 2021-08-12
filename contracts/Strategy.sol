@@ -2,10 +2,7 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import {
-    BaseStrategy,
-    StrategyParams
-} from "@yearnvaults/contracts/BaseStrategy.sol";
+import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import {
     SafeERC20,
@@ -67,6 +64,9 @@ contract Strategy is BaseStrategy {
     // DAI token
     IERC20 internal investmentToken;
 
+    // 100%
+    uint256 internal constant MAX_BPS = 100;
+
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
@@ -88,6 +88,9 @@ contract Strategy is BaseStrategy {
     // Maximum acceptable lost on withdrawal. Default to 0.01%.
     uint256 public maxLoss = 1;
 
+    // If set to true the strategy will never try to repay debt by selling want
+    bool public leaveDebtBehind;
+
     constructor(address _vault) public BaseStrategy(_vault) {
         investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
@@ -97,6 +100,9 @@ contract Strategy is BaseStrategy {
 
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
         rebalanceTolerance = 5;
+
+        // If we lose money in yvDAI then we are OK selling want to repay it
+        leaveDebtBehind = false;
     }
 
     // ----------------- SETTERS -----------------
@@ -122,6 +128,14 @@ contract Strategy is BaseStrategy {
         maxLoss = _maxLoss;
     }
 
+    // Max slippage to accept when withdrawing from yVault
+    function setLeaveDebtBehind(bool _leaveDebtBehind)
+        external
+        onlyEmergencyAuthorized
+    {
+        leaveDebtBehind = _leaveDebtBehind;
+    }
+
     // Required to move funds to a new cdp and use a different cdpId after migration.
     // Should only be called by governance as it will decide fund allocation
     function shiftToCdp(uint256 newCdpId) external onlyGovernance {
@@ -138,7 +152,6 @@ contract Strategy is BaseStrategy {
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {
-        // TODO: should be dynamic to support different ilks
         return "StrategyMakerYFI";
     }
 
@@ -267,7 +280,12 @@ contract Strategy is BaseStrategy {
         // or leave at least 'dust' balance (10,000 DAI for YFI-A)
         uint256 debtFloor = _debtFloor();
         if (newDebt <= debtFloor) {
-            if (_valueOfInvestment() >= currentDebt) {
+            // If we sold want to repay debt we will have DAI readily available in the strategy
+            // This means we need to count both yvDAI shares and current DAI balance
+            uint256 totalInvestmentAvailableToRepay =
+                _valueOfInvestment().add(balanceOfInvestmentToken());
+
+            if (totalInvestmentAvailableToRepay >= currentDebt) {
                 // Pay the entire debt if we have enough investment token
                 amountToRepay = currentDebt;
             } else {
@@ -280,6 +298,8 @@ contract Strategy is BaseStrategy {
             amountToRepay = currentDebt.sub(newDebt);
         }
 
+        // Does not matter if amountToRepay exceeds yVault's strategy balance
+        // as it happens in the case where we sold want for DAI
         uint256 withdrawn = _withdrawFromYVault(amountToRepay);
         _repayInvestmentTokenDebt(withdrawn);
     }
@@ -307,6 +327,7 @@ contract Strategy is BaseStrategy {
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
         uint256 balance = balanceOfWant();
+
         // Can we handle it without liquidating positions?
         if (balance >= _amountNeeded) {
             return (_amountNeeded, 0);
@@ -317,6 +338,10 @@ contract Strategy is BaseStrategy {
 
         uint256 price = _getWantTokenPrice();
         uint256 collateralBalance = balanceOfMakerVault();
+
+        // We cannot free more than what we have locked
+        amountToFree = Math.min(amountToFree, collateralBalance);
+
         uint256 totalDebt = balanceOfDebt();
 
         // If for some reason we do not have debt, make sure the operation does not revert
@@ -328,8 +353,38 @@ contract Strategy is BaseStrategy {
         uint256 collateralIT = collateralBalance.mul(price).div(WAD);
         uint256 newRatio = collateralIT.sub(toFreeIT).div(totalDebt);
 
+        // Attempt to repay necessary debt to restore the target collateralization ratio
         _repayDebt(newRatio);
-        _wipeAndFreeGem(amountToFree, 0);
+
+        // If we are liquidating all positions and were not able to pay the debt in full,
+        // we may need to unlock some collateral to sell
+        if (newRatio == 0 && balanceOfDebt() > 0) {
+            // Unlock as much collateral as possible while keeping the target ratio
+            _wipeAndFreeGem(_maxWithdrawal(), 0);
+
+            // If we do not intend to leave debt behind, then we calculate the amount of
+            // want to sell and exchange it for the investment token in order to repay
+            // the debt in full
+            if (!leaveDebtBehind) {
+                uint256 currentInvestmentValue = _valueOfInvestment();
+
+                // Very small numbers may round to 0 'want' to use for buying investment token
+                // Enforce a minimum of $1 to swap in order to avoid this
+                uint256 investmentLeftToAcquire =
+                    balanceOfDebt().add(1e18).sub(currentInvestmentValue);
+
+                uint256 investmentLeftToAcquireInWant =
+                    investmentLeftToAcquire.mul(WAD).div(price);
+
+                if (investmentLeftToAcquireInWant <= balanceOfWant()) {
+                    _buyInvestmentTokenWithWant(investmentLeftToAcquire);
+                    _repayDebt(0);
+                    _wipeAndFreeGem(balanceOfMakerVault(), 0);
+                }
+            }
+        } else {
+            _wipeAndFreeGem(amountToFree, 0);
+        }
 
         uint256 totalAssets = balanceOfWant();
         if (_amountNeeded > totalAssets) {
@@ -338,6 +393,35 @@ contract Strategy is BaseStrategy {
         } else {
             _liquidatedAmount = _amountNeeded;
         }
+    }
+
+    // Returns maximum collateral to withdraw while maintaining the target collateralization ratio
+    function _maxWithdrawal() internal view returns (uint256) {
+        // Denominated in want
+        uint256 totalCollateral = balanceOfMakerVault();
+
+        // Denominated in investment token
+        uint256 totalDebt = balanceOfDebt();
+
+        // If there is no debt to repay we can withdraw all the locked collateral
+        if (totalDebt == 0) {
+            return totalCollateral;
+        }
+
+        uint256 price = _getWantTokenPrice();
+
+        // Min collateral in want that needs to be locked with the outstanding debt
+        uint256 minCollateral =
+            collateralizationRatio.mul(totalDebt).mul(WAD).div(price).div(
+                MAX_BPS
+            );
+
+        // If we are under collateralized then it is not safe for us to withdraw anything
+        if (minCollateral > totalCollateral) {
+            return 0;
+        }
+
+        return totalCollateral.sub(minCollateral);
     }
 
     function liquidateAllPositions()
@@ -440,6 +524,14 @@ contract Strategy is BaseStrategy {
             amount
         );
 
+        // Do our best effort to handle small debt values guaranteed to revert
+        // due to the Vat/dust requirement
+        uint256 treshold = 1e10;
+        uint256 diff = balanceOfDebt().sub(amount);
+        if (diff > 0 && diff < treshold) {
+            amount = amount.add(treshold);
+        }
+
         if (amount > 0) {
             // Repay debt amount without unlocking collateral
             _wipeAndFreeGem(0, amount);
@@ -496,7 +588,7 @@ contract Strategy is BaseStrategy {
         // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %)
         // and multiply by 100 to correct the offset
         uint256 daiToMint =
-            amount.mul(price).mul(100).div(WAD).div(collateralizationRatio);
+            amount.mul(price).mul(MAX_BPS).div(WAD).div(collateralizationRatio);
 
         // Lock collateral and mint DAI
         _lockGemAndDraw(amount, daiToMint);
@@ -532,7 +624,7 @@ contract Strategy is BaseStrategy {
             totalDebt = 1;
         }
 
-        uint256 ratio = totalCollateralValue.mul(100).div(totalDebt);
+        uint256 ratio = totalCollateralValue.mul(MAX_BPS).div(totalDebt);
         return ratio;
     }
 
@@ -622,6 +714,21 @@ contract Strategy is BaseStrategy {
         );
     }
 
+    function _buyInvestmentTokenWithWant(uint256 _amount) internal {
+        if (_amount == 0 || address(investmentToken) == address(want)) {
+            return;
+        }
+
+        _checkAllowance(address(router), address(want), _amount);
+        router.swapTokensForExactTokens(
+            _amount,
+            type(uint256).max,
+            getTokenOutPath(address(want), address(investmentToken)),
+            address(this),
+            now
+        );
+    }
+
     // ----------------- UTILS FROM MAKERDAO DSS-PROXY-ACTIONS -----------------
 
     // Deposits collateral (gem) and mints DAI
@@ -646,7 +753,7 @@ contract Strategy is BaseStrategy {
         // Locks token amount into the CDP and generates debt
         cdpManager.frob(
             cdpId,
-            toInt(collateralAmount),
+            int256(collateralAmount),
             _getDrawDart(vat, urn, daiToMint)
         );
 
@@ -721,7 +828,7 @@ contract Strategy is BaseStrategy {
         // Paybacks debt to the CDP and unlocks token amount from it
         cdpManager.frob(
             cdpId,
-            -toInt(collateralAmount),
+            -int256(collateralAmount),
             _getWipeDart(
                 cdpManager.vat(),
                 VatLike(cdpManager.vat()).dai(urn),
@@ -750,7 +857,7 @@ contract Strategy is BaseStrategy {
         // If there was already enough DAI in the vat balance, just exits it without adding more debt
         if (dai < mul(wad, RAY)) {
             // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
-            dart = toInt(sub(mul(wad, RAY), dai) / rate);
+            dart = int256(sub(mul(wad, RAY), dai) / rate);
             // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
             dart = mul(uint256(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
         }
@@ -768,14 +875,9 @@ contract Strategy is BaseStrategy {
         (, uint256 art) = VatLike(vat).urns(ilk, urn);
 
         // Uses the whole dai balance in the vat to reduce the debt
-        dart = toInt(dai / rate);
+        dart = int256(dai / rate);
         // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
-        dart = uint256(dart) <= art ? -dart : -toInt(art);
-    }
-
-    function toInt(uint256 x) internal pure returns (int256 y) {
-        y = int256(x);
-        require(y >= 0, "int-overflow");
+        dart = uint256(dart) <= art ? -dart : -int256(art);
     }
 
     function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {

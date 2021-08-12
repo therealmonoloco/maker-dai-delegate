@@ -78,6 +78,31 @@ def test_non_authorized_cannot_set_max_loss(strategy, user):
         strategy.setMaxLoss(10, {"from": user})
 
 
+def test_gov_can_set_leave_debt_behind(strategy, gov):
+    strategy.setLeaveDebtBehind(True, {"from": gov})
+    assert strategy.leaveDebtBehind() == True
+
+
+def test_strategist_can_set_leave_debt_behind(strategy, strategist):
+    strategy.setLeaveDebtBehind(True, {"from": strategist})
+    assert strategy.leaveDebtBehind() == True
+
+
+def test_management_can_set_leave_debt_behind(strategy, management):
+    strategy.setLeaveDebtBehind(True, {"from": management})
+    assert strategy.leaveDebtBehind() == True
+
+
+def test_guardian_can_set_leave_debt_behind(strategy, guardian):
+    strategy.setLeaveDebtBehind(True, {"from": guardian})
+    assert strategy.leaveDebtBehind() == True
+
+
+def test_non_authorized_cannot_set_leave_debt_behind(strategy, user):
+    with reverts("!authorized"):
+        strategy.setLeaveDebtBehind(True, {"from": user})
+
+
 def test_gov_can_set_swap_router(strategy, gov, router):
     strategy.setSwapRouter(router, {"from": gov})
     assert strategy.router() == router

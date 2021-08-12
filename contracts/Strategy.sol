@@ -818,7 +818,7 @@ contract Strategy is BaseStrategy {
     // Returns DAI to decrease debt and attempts to unlock any amount of collateral
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L758
     function _wipeAndFreeGem(uint256 collateralAmount, uint256 daiToRepay)
-        public
+        internal
     {
         address urn = cdpManager.urns(cdpId);
 

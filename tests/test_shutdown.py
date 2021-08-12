@@ -64,7 +64,7 @@ def test_basic_shutdown(
     chain.mine(1)
 
     # Send some profit to yVault
-    dai.transfer(yvDAI, Wei("20_000 ether"), {"from": dai_whale})
+    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.03, {"from": dai_whale})
 
     # Harvest 2: Realize profit
     strategy.harvest()

@@ -24,7 +24,6 @@ contract Strategy is BaseStrategy {
     // Units used in Maker contracts
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
-    uint256 internal constant RAD = 10**45;
 
     // Maker vaults manager
     ManagerLike internal constant cdpManager =
@@ -859,11 +858,11 @@ contract Strategy is BaseStrategy {
         uint256 dai = vat.dai(urn);
 
         // If there was already enough DAI in the vat balance, just exits it without adding more debt
-        if (dai < mul(wad, RAY)) {
+        if (dai < wad.mul(RAY)) {
             // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
-            dart = int256(sub(mul(wad, RAY), dai) / rate);
+            dart = int256(wad.mul(RAY).sub(dai).div(rate));
             // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
-            dart = mul(uint256(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
+            dart = uint256(dart).mul(rate) < wad.mul(RAY) ? dart + 1 : dart;
         }
     }
 
@@ -882,13 +881,5 @@ contract Strategy is BaseStrategy {
         dart = int256(dai / rate);
         // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
         dart = uint256(dart) <= art ? -dart : -int256(art);
-    }
-
-    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require(y == 0 || (z = x * y) / y == x, "mul-overflow");
-    }
-
-    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x - y) <= x, "sub-overflow");
     }
 }

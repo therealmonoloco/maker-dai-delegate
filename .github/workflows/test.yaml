@@ -65,6 +65,7 @@ jobs:
         brownie test tests/test_access_control.py -s
         brownie test tests/test_cdp_setup.py -s
         brownie test tests/test_direct_transfer.py -s
+        brownie test tests/test_internal_liquidate_position.py -s
         brownie test tests/test_migration.py -s
         brownie test tests/test_operation.py -s
         brownie test tests/test_revoke.py -s

@@ -162,18 +162,6 @@ def test_strategy(strategist, keeper, vault, TestStrategy, gov):
     yield strategy
 
 
-@pytest.fixture
-def yfiToUsdOsmProxy():
-    yield Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
-
-
-@pytest.fixture
-def token_price(gov, yfiToUsdOsmProxy):
-    (current,) = yfiToUsdOsmProxy.peek({"from": gov})
-    (future,) = yfiToUsdOsmProxy.peep({"from": gov})
-    yield min(current, future)
-
-
 @pytest.fixture(scope="session")
 def RELATIVE_APPROX():
     yield 1e-5

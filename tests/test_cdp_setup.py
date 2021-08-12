@@ -50,28 +50,28 @@ def test_dai_should_be_minted_after_depositing_collateral(
 
 
 def test_minted_dai_should_match_collateralization_ratio(
-    strategy, vault, yvDAI, token, token_whale, price_oracle_usd, RELATIVE_APPROX
+    test_strategy, vault, yvDAI, token, token_whale, RELATIVE_APPROX
 ):
-    assert yvDAI.balanceOf(strategy) == 0
-
-    # Price is returned using 8 decimals
-    price = price_oracle_usd.latestAnswer() * 1e10
+    assert yvDAI.balanceOf(test_strategy) == 0
 
     amount = 25 * (10 ** token.decimals())
     token.approve(vault.address, amount, {"from": token_whale})
     vault.deposit(amount, {"from": token_whale})
 
     chain.sleep(1)
-    strategy.harvest()
+    test_strategy.harvest()
+
+    token_price = test_strategy._getPrice()
 
     assert pytest.approx(
-        yvDAI.balanceOf(strategy) * yvDAI.pricePerShare() / 1e18, rel=RELATIVE_APPROX
+        yvDAI.balanceOf(test_strategy) * yvDAI.pricePerShare() / 1e18,
+        rel=RELATIVE_APPROX,
     ) == (
-        price
+        token_price
         * amount
         / (10 ** token.decimals())
         * 100
-        / strategy.collateralizationRatio()
+        / test_strategy.collateralizationRatio()
     )
 
 
@@ -88,21 +88,20 @@ def test_ethToWant_should_convert_to_yfi(strategy, price_oracle_eth, RELATIVE_AP
     ) == Wei("0.5 ether")
 
 
+# Needs to use test_strategy fixture to be able to read token_price
 def test_delegated_assets_pricing(
-    strategy, vault, yvDAI, token, token_whale, dai, price_oracle_usd, RELATIVE_APPROX
+    test_strategy, vault, yvDAI, token, token_whale, RELATIVE_APPROX
 ):
     amount = 25 * (10 ** token.decimals())
     token.approve(vault.address, amount, {"from": token_whale})
     vault.deposit(amount, {"from": token_whale})
 
     chain.sleep(1)
-    strategy.harvest()
+    test_strategy.harvest()
 
-    # Price is returned using 8 decimals
-    price = price_oracle_usd.latestAnswer() * 1e10
+    dai_balance = yvDAI.balanceOf(test_strategy) * yvDAI.pricePerShare() / 1e18
+    token_price = test_strategy._getPrice()
 
-    dai_balance = yvDAI.balanceOf(strategy) * yvDAI.pricePerShare() / 1e18
-
-    assert pytest.approx(strategy.delegatedAssets(), rel=RELATIVE_APPROX) == (
-        dai_balance / price * (10 ** token.decimals())
+    assert pytest.approx(test_strategy.delegatedAssets(), rel=RELATIVE_APPROX) == (
+        dai_balance / token_price * (10 ** token.decimals())
     )

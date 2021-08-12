@@ -50,6 +50,12 @@ contract Strategy is BaseStrategy {
     SpotLike internal constant spotter =
         SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
 
+    // Maker Oracle Security Module
+    OracleSecurityModule public constant YFItoUSDOSMProxy =
+        OracleSecurityModule(0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f);
+    OracleSecurityModule public constant YFItoUSDOSM =
+        OracleSecurityModule(0x5F122465bCf86F45922036970Be6DD7F58820214);
+
     // Use Chainlink oracle to obtain latest YFI/USD price
     AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
         AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
@@ -569,8 +575,20 @@ contract Strategy is BaseStrategy {
     }
 
     function _getWantTokenPrice() internal view returns (uint256) {
+        // Attempt to read worst possible price from Maker's Oracle Security Module
+        if (
+            YFItoUSDOSM.bud(address(YFItoUSDOSMProxy)) &&
+            YFItoUSDOSMProxy.users(address(this))
+        ) {
+            (uint256 current, bool has) = YFItoUSDOSMProxy.peek();
+            (uint256 future, ) = YFItoUSDOSMProxy.peep();
+            if (has) {
+                return future < current ? future : current;
+            }
+        }
+
+        // If no price is available or we are not whitelisted, use Chainlink as a fallback
         int256 price = chainlinkYFItoUSDPriceFeed.latestAnswer();
-        require(price > 0); // dev: invalid price returned by chainlink oracle
         // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
         return uint256(price * 1e10);
     }

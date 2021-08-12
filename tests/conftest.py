@@ -141,6 +141,11 @@ def strategy(strategist, keeper, vault, Strategy, gov):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+
+    # Allow the strategy to query the OSM proxy
+    YFItoUSDOSMProxy = Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
+    YFItoUSDOSMProxy.set_user(strategy, True, {"from": gov})
+
     yield strategy
 
 
@@ -149,7 +154,24 @@ def test_strategy(strategist, keeper, vault, TestStrategy, gov):
     strategy = strategist.deploy(TestStrategy, vault)
     strategy.setKeeper(keeper)
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+
+    # Allow the strategy to query the OSM proxy
+    YFItoUSDOSMProxy = Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
+    YFItoUSDOSMProxy.set_user(strategy, True, {"from": gov})
+
     yield strategy
+
+
+@pytest.fixture
+def yfiToUsdOsmProxy():
+    yield Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
+
+
+@pytest.fixture
+def token_price(gov, yfiToUsdOsmProxy):
+    (current,) = yfiToUsdOsmProxy.peek({"from": gov})
+    (future,) = yfiToUsdOsmProxy.peep({"from": gov})
+    yield min(current, future)
 
 
 @pytest.fixture(scope="session")

@@ -73,15 +73,7 @@ def test_liquidate_position_without_enough_profit_by_selling_want(
 # are made and the debt set right above the floor (dust) set by Maker for YFI-A,
 # which is currently 10,000 DAI
 def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
-    chain,
-    token,
-    vault,
-    test_strategy,
-    user,
-    gov,
-    amount,
-    price_oracle_usd,
-    RELATIVE_APPROX,
+    chain, token, vault, test_strategy, user, gov, amount, RELATIVE_APPROX
 ):
     # Make sure the strategy never sells any want
     test_strategy.setLeaveDebtBehind(True, {"from": gov})
@@ -97,14 +89,14 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
     # Harvest so all the collateral is locked in the CDP
     test_strategy.harvest()
 
-    price = price_oracle_usd.latestAnswer() * 1e10
+    token_price = test_strategy._getPrice()
 
     # Cannot have more than dust * collateralization ratio (~25,000 DAI)
     # of collateral unless we pay the full debt.
     # Here we are leaving it behind, so it's a 25k "loss" priced in want
     min_locked_collateral_for_debt_floor = (
         Wei("10_000 ether")
-        / price
+        / token_price
         * 1e18
         * test_strategy.collateralizationRatio()
         / 100
@@ -123,16 +115,7 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
 
 # In this test the strategy has enough profit to close the whole position
 def test_happy_liquidation(
-    chain,
-    token,
-    vault,
-    test_strategy,
-    yvDAI,
-    dai,
-    dai_whale,
-    user,
-    amount,
-    RELATIVE_APPROX,
+    chain, token, vault, test_strategy, yvDAI, dai, dai_whale, user, amount
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})

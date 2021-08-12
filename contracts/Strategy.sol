@@ -24,7 +24,6 @@ contract Strategy is BaseStrategy {
     // Units used in Maker contracts
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
-    uint256 internal constant RAD = 10**45;
 
     // Maker vaults manager
     ManagerLike internal constant cdpManager =
@@ -50,13 +49,20 @@ contract Strategy is BaseStrategy {
     SpotLike internal constant spotter =
         SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
 
-    // Use Chainlink oracle to obtain latest YFI/USD price
-    AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
-        AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
+    // Maker Accounting System
+    VatLike internal vat;
+
+    // Maker Oracle Security Module
+    OracleSecurityModule public constant YFItoUSDOSMProxy =
+        OracleSecurityModule(0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f);
 
     // Use Chainlink oracle to obtain latest YFI/ETH price
     AggregatorInterface internal constant chainlinkYFItoETHPriceFeed =
         AggregatorInterface(0x7c5d4F8345e66f68099581Db340cd65B078C41f4);
+
+    // Use Chainlink oracle to obtain latest YFI/USD price
+    AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
+        AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
 
     // DAI yVault
     IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
@@ -94,6 +100,7 @@ contract Strategy is BaseStrategy {
     constructor(address _vault) public BaseStrategy(_vault) {
         investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
+        vat = VatLike(cdpManager.vat());
 
         // Minimum collaterization ratio on YFI-A is 175%. Use 250% as target.
         collateralizationRatio = 250;
@@ -569,10 +576,23 @@ contract Strategy is BaseStrategy {
     }
 
     function _getWantTokenPrice() internal view returns (uint256) {
-        int256 price = chainlinkYFItoUSDPriceFeed.latestAnswer();
-        require(price > 0); // dev: invalid price returned by chainlink oracle
+        uint256 minPrice;
+
+        // Assume we are white-listed in the OSM
+        (uint256 current, bool isCurrentValid) = YFItoUSDOSMProxy.peek();
+        (uint256 future, bool isFutureValid) = YFItoUSDOSMProxy.peep();
+        if (isCurrentValid && isFutureValid) {
+            minPrice = Math.min(future, current);
+        }
+
         // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
-        return uint256(price * 1e10);
+        uint256 chainLinkPrice =
+            uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
+
+        // Return the worst price available
+        minPrice = Math.min(minPrice, chainLinkPrice);
+        require(minPrice > 0);
+        return minPrice;
     }
 
     function _depositToMakerVault(uint256 amount) internal {
@@ -601,8 +621,6 @@ contract Strategy is BaseStrategy {
     // ----------------- INTERNAL CALCS -----------------.
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {
-        VatLike vat = VatLike(cdpManager.vat());
-
         // spot: collateral price with safety margin returned in ray (10**27)
         (, , uint256 spot, , ) = vat.ilks(ilk);
 
@@ -638,7 +656,6 @@ contract Strategy is BaseStrategy {
 
     function balanceOfDebt() internal view returns (uint256) {
         address urn = cdpManager.urns(cdpId);
-        VatLike vat = VatLike(cdpManager.vat());
 
         // Normalized outstanding stablecoin debt [wad]
         (, uint256 art) = vat.urns(ilk, urn);
@@ -652,11 +669,8 @@ contract Strategy is BaseStrategy {
 
     // Returns collateral balance in the vault
     function balanceOfMakerVault() internal view returns (uint256) {
-        uint256 ink; // collateral balance
-        uint256 art; // normalized outstanding stablecoin debt
         address urn = cdpManager.urns(cdpId);
-        VatLike vat = VatLike(cdpManager.vat());
-        (ink, art) = vat.urns(ilk, urn);
+        (uint256 ink, ) = vat.urns(ilk, urn);
         return ink;
     }
 
@@ -745,7 +759,6 @@ contract Strategy is BaseStrategy {
         }
 
         address urn = cdpManager.urns(cdpId);
-        VatLike vat = VatLike(cdpManager.vat());
 
         // Takes token amount from the strategy and joins into the vat
         gemJoinAdapter.join(urn, collateralAmount);
@@ -754,7 +767,7 @@ contract Strategy is BaseStrategy {
         cdpManager.frob(
             cdpId,
             int256(collateralAmount),
-            _getDrawDart(vat, urn, daiToMint)
+            _getDrawDart(urn, daiToMint)
         );
 
         // Moves the DAI amount to the strategy. Need to convert dai from [wad] to [rad]
@@ -771,8 +784,6 @@ contract Strategy is BaseStrategy {
         internal
         returns (uint256)
     {
-        VatLike vat = VatLike(cdpManager.vat());
-
         // uint256 Art;   // Total Normalised Debt     [wad]
         // uint256 rate;  // Accumulated Rates         [ray]
         // uint256 spot;  // Price with Safety Margin  [ray]
@@ -804,8 +815,6 @@ contract Strategy is BaseStrategy {
     }
 
     function _debtFloor() internal returns (uint256) {
-        VatLike vat = VatLike(cdpManager.vat());
-
         // uint256 Art;   // Total Normalised Debt     [wad]
         // uint256 rate;  // Accumulated Rates         [ray]
         // uint256 spot;  // Price with Safety Margin  [ray]
@@ -829,11 +838,7 @@ contract Strategy is BaseStrategy {
         cdpManager.frob(
             cdpId,
             -int256(collateralAmount),
-            _getWipeDart(
-                cdpManager.vat(),
-                VatLike(cdpManager.vat()).dai(urn),
-                urn
-            )
+            _getWipeDart(vat.dai(urn), urn)
         );
         // Moves the amount from the CDP urn to proxy's address
         cdpManager.flux(cdpId, address(this), collateralAmount);
@@ -843,11 +848,10 @@ contract Strategy is BaseStrategy {
     }
 
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L161
-    function _getDrawDart(
-        VatLike vat,
-        address urn,
-        uint256 wad
-    ) internal returns (int256 dart) {
+    function _getDrawDart(address urn, uint256 wad)
+        internal
+        returns (int256 dart)
+    {
         // Updates stability fee rate
         uint256 rate = jug.drip(ilk);
 
@@ -855,36 +859,28 @@ contract Strategy is BaseStrategy {
         uint256 dai = vat.dai(urn);
 
         // If there was already enough DAI in the vat balance, just exits it without adding more debt
-        if (dai < mul(wad, RAY)) {
+        if (dai < wad.mul(RAY)) {
             // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
-            dart = int256(sub(mul(wad, RAY), dai) / rate);
+            dart = int256(wad.mul(RAY).sub(dai).div(rate));
             // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
-            dart = mul(uint256(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
+            dart = uint256(dart).mul(rate) < wad.mul(RAY) ? dart + 1 : dart;
         }
     }
 
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L183
-    function _getWipeDart(
-        address vat,
-        uint256 dai,
-        address urn
-    ) internal view returns (int256 dart) {
+    function _getWipeDart(uint256 dai, address urn)
+        internal
+        view
+        returns (int256 dart)
+    {
         // Gets actual rate from the vat
-        (, uint256 rate, , , ) = VatLike(vat).ilks(ilk);
+        (, uint256 rate, , , ) = vat.ilks(ilk);
         // Gets actual art value of the urn
-        (, uint256 art) = VatLike(vat).urns(ilk, urn);
+        (, uint256 art) = vat.urns(ilk, urn);
 
         // Uses the whole dai balance in the vat to reduce the debt
         dart = int256(dai / rate);
         // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
         dart = uint256(dart) <= art ? -dart : -int256(art);
-    }
-
-    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require(y == 0 || (z = x * y) / y == x, "mul-overflow");
-    }
-
-    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x - y) <= x, "sub-overflow");
     }
 }

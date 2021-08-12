@@ -49,6 +49,9 @@ contract Strategy is BaseStrategy {
     SpotLike internal constant spotter =
         SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
 
+    // Maker Accounting System
+    VatLike internal vat;
+
     // Maker Oracle Security Module
     OracleSecurityModule public constant YFItoUSDOSMProxy =
         OracleSecurityModule(0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f);
@@ -58,6 +61,10 @@ contract Strategy is BaseStrategy {
     // Use Chainlink oracle to obtain latest YFI/ETH price
     AggregatorInterface internal constant chainlinkYFItoETHPriceFeed =
         AggregatorInterface(0x7c5d4F8345e66f68099581Db340cd65B078C41f4);
+
+    // Use Chainlink oracle to obtain latest YFI/USD price
+    AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
+        AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
 
     // DAI yVault
     IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
@@ -95,6 +102,7 @@ contract Strategy is BaseStrategy {
     constructor(address _vault) public BaseStrategy(_vault) {
         investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
+        vat = VatLike(cdpManager.vat());
 
         // Minimum collaterization ratio on YFI-A is 175%. Use 250% as target.
         collateralizationRatio = 250;
@@ -570,12 +578,21 @@ contract Strategy is BaseStrategy {
     }
 
     function _getWantTokenPrice() internal view returns (uint256) {
-        // Attempt to read worst possible price from Maker's Oracle Security Module
-        // Assume white-listed
+        uint256 minPrice;
+
+        // Assume we are white-listed in the OSM
         (uint256 current, bool isCurrentValid) = YFItoUSDOSMProxy.peek();
         (uint256 future, bool isFutureValid) = YFItoUSDOSMProxy.peep();
-        require(isCurrentValid && isFutureValid);
-        return future < current ? future : current;
+        if (isCurrentValid && isFutureValid) {
+            minPrice = Math.min(future, current);
+        }
+
+        // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
+        uint256 chainLinkPrice =
+            uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
+
+        // Return the worst price available
+        return Math.min(minPrice, chainLinkPrice);
     }
 
     function _depositToMakerVault(uint256 amount) internal {
@@ -604,8 +621,6 @@ contract Strategy is BaseStrategy {
     // ----------------- INTERNAL CALCS -----------------.
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {
-        VatLike vat = VatLike(cdpManager.vat());
-
         // spot: collateral price with safety margin returned in ray (10**27)
         (, , uint256 spot, , ) = vat.ilks(ilk);
 
@@ -641,7 +656,6 @@ contract Strategy is BaseStrategy {
 
     function balanceOfDebt() internal view returns (uint256) {
         address urn = cdpManager.urns(cdpId);
-        VatLike vat = VatLike(cdpManager.vat());
 
         // Normalized outstanding stablecoin debt [wad]
         (, uint256 art) = vat.urns(ilk, urn);
@@ -655,11 +669,8 @@ contract Strategy is BaseStrategy {
 
     // Returns collateral balance in the vault
     function balanceOfMakerVault() internal view returns (uint256) {
-        uint256 ink; // collateral balance
-        uint256 art; // normalized outstanding stablecoin debt
         address urn = cdpManager.urns(cdpId);
-        VatLike vat = VatLike(cdpManager.vat());
-        (ink, art) = vat.urns(ilk, urn);
+        (uint256 ink, ) = vat.urns(ilk, urn);
         return ink;
     }
 
@@ -748,7 +759,6 @@ contract Strategy is BaseStrategy {
         }
 
         address urn = cdpManager.urns(cdpId);
-        VatLike vat = VatLike(cdpManager.vat());
 
         // Takes token amount from the strategy and joins into the vat
         gemJoinAdapter.join(urn, collateralAmount);
@@ -774,8 +784,6 @@ contract Strategy is BaseStrategy {
         internal
         returns (uint256)
     {
-        VatLike vat = VatLike(cdpManager.vat());
-
         // uint256 Art;   // Total Normalised Debt     [wad]
         // uint256 rate;  // Accumulated Rates         [ray]
         // uint256 spot;  // Price with Safety Margin  [ray]
@@ -807,8 +815,6 @@ contract Strategy is BaseStrategy {
     }
 
     function _debtFloor() internal returns (uint256) {
-        VatLike vat = VatLike(cdpManager.vat());
-
         // uint256 Art;   // Total Normalised Debt     [wad]
         // uint256 rate;  // Accumulated Rates         [ray]
         // uint256 spot;  // Price with Safety Margin  [ray]

@@ -367,22 +367,19 @@ contract Strategy is BaseStrategy {
             // the debt in full
             if (!leaveDebtBehind) {
                 uint256 currentInvestmentValue = _valueOfInvestment();
-                uint256 investmentLeftToAcquire =
-                    balanceOfDebt().sub(currentInvestmentValue);
 
                 // Very small numbers may round to 0 'want' to use for buying investment token
                 // Enforce a minimum of $1 to swap in order to avoid this
-                investmentLeftToAcquire = Math.max(
-                    investmentLeftToAcquire,
-                    1e18
-                );
+                uint256 investmentLeftToAcquire =
+                    balanceOfDebt().add(1e18).sub(currentInvestmentValue);
 
                 uint256 investmentLeftToAcquireInWant =
                     investmentLeftToAcquire.mul(WAD).div(price);
 
-                if (investmentLeftToAcquireInWant < balanceOfWant()) {
-                    _buyInvestmentTokenWithWant(investmentLeftToAcquireInWant);
+                if (investmentLeftToAcquireInWant <= balanceOfWant()) {
+                    _buyInvestmentTokenWithWant(investmentLeftToAcquire);
                     _repayDebt(0);
+                    _wipeAndFreeGem(balanceOfMakerVault(), 0);
                 }
             }
         } else {
@@ -526,6 +523,14 @@ contract Strategy is BaseStrategy {
             address(investmentToken),
             amount
         );
+
+        // Do our best effort to handle small debt values guaranteed to revert
+        // due to the Vat/dust requirement
+        uint256 treshold = 1e10;
+        uint256 diff = balanceOfDebt().sub(amount);
+        if (diff > 0 && diff < treshold) {
+            amount = amount.add(treshold);
+        }
 
         if (amount > 0) {
             // Repay debt amount without unlocking collateral

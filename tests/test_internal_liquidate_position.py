@@ -115,15 +115,7 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
 
 # In this test the strategy has enough profit to close the whole position
 def test_happy_liquidation(
-    chain,
-    token,
-    vault,
-    test_strategy,
-    yvDAI,
-    dai,
-    dai_whale,
-    user,
-    amount
+    chain, token, vault, test_strategy, yvDAI, dai, dai_whale, user, amount
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})

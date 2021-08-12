@@ -55,8 +55,6 @@ contract Strategy is BaseStrategy {
     // Maker Oracle Security Module
     OracleSecurityModule public constant YFItoUSDOSMProxy =
         OracleSecurityModule(0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f);
-    OracleSecurityModule public constant YFItoUSDOSM =
-        OracleSecurityModule(0x5F122465bCf86F45922036970Be6DD7F58820214);
 
     // Use Chainlink oracle to obtain latest YFI/ETH price
     AggregatorInterface internal constant chainlinkYFItoETHPriceFeed =

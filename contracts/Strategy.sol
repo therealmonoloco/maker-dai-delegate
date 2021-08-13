@@ -305,10 +305,6 @@ contract Strategy is BaseStrategy {
             amountToRepay = currentDebt.sub(newDebt);
         }
 
-        // Pay one extra wei to prevent Vat/dust reverts
-        // FIXME: Better alternative?
-        amountToRepay = amountToRepay.add(1);
-
         uint256 balanceIT = balanceOfInvestmentToken();
         if (amountToRepay > balanceIT) {
             _withdrawFromYVault(amountToRepay.sub(balanceIT));
@@ -524,11 +520,14 @@ contract Strategy is BaseStrategy {
             return;
         }
 
+        uint256 debt = balanceOfDebt();
+        uint256 balanceIT = balanceOfInvestmentToken();
+
         // We cannot pay more than loose balance
-        amount = Math.min(amount, balanceOfInvestmentToken());
+        amount = Math.min(amount, balanceIT);
 
         // We cannot pay more than we owe
-        amount = Math.min(amount, balanceOfDebt());
+        amount = Math.min(amount, debt);
 
         _checkAllowance(
             address(daiJoinAdapter),
@@ -536,15 +535,11 @@ contract Strategy is BaseStrategy {
             amount
         );
 
-        // Do our best effort to handle small debt values guaranteed to revert
-        // due to the Vat/dust requirement
-        uint256 treshold = 1e10;
-        uint256 diff = balanceOfDebt().sub(amount);
-        if (diff > 0 && diff < treshold) {
-            amount = amount.add(treshold);
-        }
-
         if (amount > 0) {
+            if (debt.sub(amount) == 0) {
+                amount = amount.add(1);
+            }
+
             // Repay debt amount without unlocking collateral
             _wipeAndFreeGem(0, amount);
         }
@@ -885,6 +880,7 @@ contract Strategy is BaseStrategy {
 
         // Uses the whole dai balance in the vat to reduce the debt
         dart = int256(dai / rate);
+
         // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
         dart = uint256(dart) <= art ? -dart : -int256(art);
     }

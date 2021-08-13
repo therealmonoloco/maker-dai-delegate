@@ -163,9 +163,7 @@ contract Strategy is BaseStrategy {
     }
 
     function delegatedAssets() external view override returns (uint256) {
-        uint256 yvDAIShares = yVault.balanceOf(address(this));
-        uint256 wantPrice = _getWantTokenPrice();
-        return yvDAIShares.mul(yVault.pricePerShare()).div(wantPrice);
+        return _valueOfInvestment().mul(WAD).div(_getWantTokenPrice());
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {

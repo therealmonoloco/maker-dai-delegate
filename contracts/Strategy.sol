@@ -536,7 +536,13 @@ contract Strategy is BaseStrategy {
         );
 
         if (amount > 0) {
-            if (debt.sub(amount) == 0) {
+            // When repaying the full debt it is very common to experience Vat/dust
+            // reverts due to the debt being non-zero and less than the debt floor.
+            // This can happen due to rounding when _wipeAndFreeGem() divides
+            // the DAI amount by the accumulated stability fee rate.
+            // To circumvent this issue we will add 1 Wei to the amount to be paid
+            // if there is enough investment token balance (DAI) to do it.
+            if (debt.sub(amount) == 0 && balanceIT.sub(amount) >= 1) {
                 amount = amount.add(1);
             }
 

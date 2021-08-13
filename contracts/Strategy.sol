@@ -604,15 +604,15 @@ contract Strategy is BaseStrategy {
             return;
         }
 
-        uint256 price = _getWantTokenPrice();
-
         _checkAllowance(address(gemJoinAdapter), address(want), amount);
+
+        uint256 price = _getWantTokenPrice();
 
         // Both `amount` and `price` are in wad, therefore amount.mul(price).div(WAD) is the total USD value
         // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %)
         // and multiply by 100 to correct the offset
         uint256 daiToMint =
-            amount.mul(price).mul(MAX_BPS).div(WAD).div(collateralizationRatio);
+            amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
 
         // Lock collateral and mint DAI
         _lockGemAndDraw(amount, daiToMint);
@@ -625,20 +625,19 @@ contract Strategy is BaseStrategy {
     // ----------------- INTERNAL CALCS -----------------.
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {
-        // spot: collateral price with safety margin returned in ray (10**27)
+        // spot: collateral price with safety margin returned in [ray]
         (, , uint256 spot, , ) = vat.ilks(ilk);
 
-        // Convert spot from [ray] to [wad]
-        spot = spot.div(1e9);
-
-        // Liquidation ratio for the given ilk
+        // Liquidation ratio for the given ilk returned in [ray]
         // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
         (, uint256 liquidationRatio) = spotter.ilks(ilk);
 
+        // Use pessimistic price to determine the worst ratio possible
+        uint256 price = spot.mul(liquidationRatio).div(RAY * 1e9); // convert ray*ray --> wad
+        price = Math.min(price, _getWantTokenPrice());
+
         uint256 totalCollateralValue =
-            balanceOfMakerVault().mul(spot).mul(liquidationRatio).div(RAY).div(
-                WAD
-            );
+            balanceOfMakerVault().mul(price).div(WAD);
         uint256 totalDebt = balanceOfDebt();
 
         // If for some reason we do not have debt, make sure the operation does not revert

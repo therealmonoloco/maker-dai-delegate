@@ -1,116 +1,86 @@
-import pytest
-
 from brownie import reverts
 
 
-def test_gov_can_set_collateralization_ratio(strategy, gov):
-    strategy.setCollateralizationRatio(222, {"from": gov})
-    assert strategy.collateralizationRatio() == 222
-
-
-def test_strategist_can_set_collateralization_ratio(strategy, strategist):
-    strategy.setCollateralizationRatio(200, {"from": strategist})
+def test_set_collateralization_ratio_acl(
+    strategy, gov, strategist, management, guardian, user
+):
+    strategy.setCollateralizationRatio(200, {"from": gov})
     assert strategy.collateralizationRatio() == 200
 
+    strategy.setCollateralizationRatio(210, {"from": strategist})
+    assert strategy.collateralizationRatio() == 210
 
-def test_management_can_set_collateralization_ratio(strategy, management):
-    strategy.setCollateralizationRatio(200, {"from": management})
-    assert strategy.collateralizationRatio() == 200
+    strategy.setCollateralizationRatio(220, {"from": management})
+    assert strategy.collateralizationRatio() == 220
 
+    strategy.setCollateralizationRatio(230, {"from": guardian})
+    assert strategy.collateralizationRatio() == 230
 
-def test_guardian_can_set_collateralization_ratio(strategy, guardian):
-    strategy.setCollateralizationRatio(200, {"from": guardian})
-    assert strategy.collateralizationRatio() == 200
-
-
-def test_non_authorized_cannot_set_collateralization_ratio(strategy, user):
     with reverts("!authorized"):
         strategy.setCollateralizationRatio(123, {"from": user})
 
 
-def test_gov_can_set_rebalance_tolerance(strategy, gov):
+def test_set_rebalance_tolerance_acl(
+    strategy, gov, strategist, management, guardian, user
+):
     strategy.setRebalanceTolerance(5, {"from": gov})
     assert strategy.rebalanceTolerance() == 5
 
+    strategy.setRebalanceTolerance(4, {"from": strategist})
+    assert strategy.rebalanceTolerance() == 4
 
-def test_strategist_can_set_rebalance_tolerance(strategy, strategist):
-    strategy.setRebalanceTolerance(5, {"from": strategist})
-    assert strategy.rebalanceTolerance() == 5
+    strategy.setRebalanceTolerance(3, {"from": management})
+    assert strategy.rebalanceTolerance() == 3
 
+    strategy.setRebalanceTolerance(2, {"from": guardian})
+    assert strategy.rebalanceTolerance() == 2
 
-def test_management_can_set_rebalance_tolerance(strategy, management):
-    strategy.setRebalanceTolerance(5, {"from": management})
-    assert strategy.rebalanceTolerance() == 5
-
-
-def test_guardian_can_set_rebalance_tolerance(strategy, guardian):
-    strategy.setRebalanceTolerance(5, {"from": guardian})
-    assert strategy.rebalanceTolerance() == 5
-
-
-def test_non_authorized_cannot_set_rebalance_tolerance(strategy, user):
     with reverts("!authorized"):
         strategy.setRebalanceTolerance(5, {"from": user})
 
 
-def test_gov_can_set_max_loss(strategy, gov):
+def test_set_max_loss_acl(strategy, gov, strategist, management, guardian, user):
     strategy.setMaxLoss(10, {"from": gov})
     assert strategy.maxLoss() == 10
 
+    strategy.setMaxLoss(11, {"from": strategist})
+    assert strategy.maxLoss() == 11
 
-def test_strategist_can_set_max_loss(strategy, strategist):
-    strategy.setMaxLoss(10, {"from": strategist})
-    assert strategy.maxLoss() == 10
+    strategy.setMaxLoss(12, {"from": management})
+    assert strategy.maxLoss() == 12
 
+    strategy.setMaxLoss(13, {"from": guardian})
+    assert strategy.maxLoss() == 13
 
-def test_management_can_set_max_loss(strategy, management):
-    strategy.setMaxLoss(10, {"from": management})
-    assert strategy.maxLoss() == 10
-
-
-def test_guardian_can_set_max_loss(strategy, guardian):
-    strategy.setMaxLoss(10, {"from": guardian})
-    assert strategy.maxLoss() == 10
-
-
-def test_non_authorized_cannot_set_max_loss(strategy, user):
     with reverts("!authorized"):
         strategy.setMaxLoss(10, {"from": user})
 
 
-def test_gov_can_set_leave_debt_behind(strategy, gov):
+def test_set_leave_debt_behind_acl(
+    strategy, gov, strategist, management, guardian, user
+):
     strategy.setLeaveDebtBehind(True, {"from": gov})
     assert strategy.leaveDebtBehind() == True
 
+    strategy.setLeaveDebtBehind(False, {"from": strategist})
+    assert strategy.leaveDebtBehind() == False
 
-def test_strategist_can_set_leave_debt_behind(strategy, strategist):
-    strategy.setLeaveDebtBehind(True, {"from": strategist})
-    assert strategy.leaveDebtBehind() == True
-
-
-def test_management_can_set_leave_debt_behind(strategy, management):
     strategy.setLeaveDebtBehind(True, {"from": management})
     assert strategy.leaveDebtBehind() == True
 
+    strategy.setLeaveDebtBehind(False, {"from": guardian})
+    assert strategy.leaveDebtBehind() == False
 
-def test_guardian_can_set_leave_debt_behind(strategy, guardian):
-    strategy.setLeaveDebtBehind(True, {"from": guardian})
-    assert strategy.leaveDebtBehind() == True
-
-
-def test_non_authorized_cannot_set_leave_debt_behind(strategy, user):
     with reverts("!authorized"):
         strategy.setLeaveDebtBehind(True, {"from": user})
 
 
-def test_gov_can_set_swap_router(strategy, gov, router):
+def test_set_swap_router_acl(
+    strategy, router, gov, strategist, management, guardian, user
+):
     strategy.setSwapRouter(router, {"from": gov})
     assert strategy.router() == router
 
-
-def test_non_gov_cannot_set_swap_router(
-    strategy, strategist, management, guardian, user, router
-):
     with reverts("!authorized"):
         strategy.setSwapRouter(router, {"from": strategist})
 
@@ -124,13 +94,11 @@ def test_non_gov_cannot_set_swap_router(
         strategy.setSwapRouter(router, {"from": user})
 
 
-def test_gov_can_shift_cdp(strategy, gov):
-    # cdp-not-allowed should be the revert msg since we are shifting to a random cdp
+def test_shift_cdp_acl(strategy, gov, strategist, management, guardian, user):
+    # cdp-not-allowed should be the revert msg when allowed / we are shifting to a random cdp
     with reverts("cdp-not-allowed"):
         strategy.shiftToCdp(123, {"from": gov})
 
-
-def test_non_gov_cannot_shift_cdp(strategy, strategist, management, guardian, user):
     with reverts("!authorized"):
         strategy.shiftToCdp(123, {"from": strategist})
 

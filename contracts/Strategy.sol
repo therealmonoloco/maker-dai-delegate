@@ -71,7 +71,7 @@ contract Strategy is BaseStrategy {
     IERC20 internal investmentToken;
 
     // 100%
-    uint256 internal constant MAX_BPS = 100;
+    uint256 internal constant MAX_BPS = WAD;
 
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -102,11 +102,13 @@ contract Strategy is BaseStrategy {
         cdpId = cdpManager.open(ilk, address(this));
         vat = VatLike(cdpManager.vat());
 
-        // Minimum collaterization ratio on YFI-A is 175%. Use 250% as target.
-        collateralizationRatio = 250;
+        // Minimum collaterization ratio on YFI-A is 175%
+        // Use 250% as target
+        collateralizationRatio = (250 * MAX_BPS) / 100;
 
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
-        rebalanceTolerance = 5;
+        // Allow additional 5% in any direction (245, 255) by default
+        rebalanceTolerance = (5 * MAX_BPS) / 100;
 
         // If we lose money in yvDAI then we are OK selling want to repay it
         leaveDebtBehind = false;

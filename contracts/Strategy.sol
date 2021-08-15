@@ -359,7 +359,8 @@ contract Strategy is BaseStrategy {
 
         uint256 toFreeIT = amountToFree.mul(price).div(WAD);
         uint256 collateralIT = collateralBalance.mul(price).div(WAD);
-        uint256 newRatio = collateralIT.sub(toFreeIT).div(totalDebt);
+        uint256 newRatio =
+            collateralIT.sub(toFreeIT).mul(MAX_BPS).div(totalDebt);
 
         // Attempt to repay necessary debt to restore the target collateralization ratio
         _repayDebt(newRatio);
@@ -636,6 +637,7 @@ contract Strategy is BaseStrategy {
 
         // Use pessimistic price to determine the worst ratio possible
         uint256 price = spot.mul(liquidationRatio).div(RAY * 1e9); // convert ray*ray --> wad
+
         price = Math.min(price, _getWantTokenPrice());
 
         uint256 totalCollateralValue =

@@ -14,7 +14,7 @@ def test_liquidates_all_if_exact_same_want_balance(test_strategy, token, token_w
 
 
 def test_liquidates_all_if_has_more_want_balance(test_strategy, token, token_whale):
-    amount = Wei("200 ether")
+    amount = Wei("50 ether")
     token.approve(test_strategy, amount, {"from": token_whale})
     token.transfer(test_strategy, amount, {"from": token_whale})
 
@@ -29,7 +29,7 @@ def test_liquidates_all_if_has_more_want_balance(test_strategy, token, token_wha
 def test_liquidate_more_than_we_have_should_report_loss(
     test_strategy, token, token_whale
 ):
-    amount = Wei("200 ether")
+    amount = Wei("50 ether")
     token.approve(test_strategy, amount, {"from": token_whale})
     token.transfer(test_strategy, amount, {"from": token_whale})
 
@@ -97,9 +97,7 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
     min_locked_collateral_for_debt_floor = (
         Wei("10_000 ether")
         / token_price
-        * 1e18
-        * test_strategy.collateralizationRatio()
-        / 100
+        * test_strategy.collateralizationRatio()  # already in wad
     )
 
     (_liquidatedAmount, _loss) = test_strategy._liquidatePosition(amount).return_value

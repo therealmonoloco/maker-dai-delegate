@@ -67,11 +67,7 @@ def test_minted_dai_should_match_collateralization_ratio(
         yvDAI.balanceOf(test_strategy) * yvDAI.pricePerShare() / 1e18,
         rel=RELATIVE_APPROX,
     ) == (
-        token_price
-        * amount
-        / (10 ** token.decimals())
-        * 100
-        / test_strategy.collateralizationRatio()
+        token_price * amount / test_strategy.collateralizationRatio()  # already in wad
     )
 
 

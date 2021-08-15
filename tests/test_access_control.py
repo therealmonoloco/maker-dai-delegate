@@ -4,20 +4,20 @@ from brownie import reverts
 def test_set_collateralization_ratio_acl(
     strategy, gov, strategist, management, guardian, user
 ):
-    strategy.setCollateralizationRatio(200, {"from": gov})
-    assert strategy.collateralizationRatio() == 200
+    strategy.setCollateralizationRatio(200 * 1e18, {"from": gov})
+    assert strategy.collateralizationRatio() == 200 * 1e18
 
-    strategy.setCollateralizationRatio(210, {"from": strategist})
-    assert strategy.collateralizationRatio() == 210
+    strategy.setCollateralizationRatio(201 * 1e18, {"from": strategist})
+    assert strategy.collateralizationRatio() == 201 * 1e18
 
-    strategy.setCollateralizationRatio(220, {"from": management})
-    assert strategy.collateralizationRatio() == 220
+    strategy.setCollateralizationRatio(202 * 1e18, {"from": management})
+    assert strategy.collateralizationRatio() == 202 * 1e18
 
-    strategy.setCollateralizationRatio(230, {"from": guardian})
-    assert strategy.collateralizationRatio() == 230
+    strategy.setCollateralizationRatio(203 * 1e18, {"from": guardian})
+    assert strategy.collateralizationRatio() == 203 * 1e18
 
     with reverts("!authorized"):
-        strategy.setCollateralizationRatio(123, {"from": user})
+        strategy.setCollateralizationRatio(200 * 1e18, {"from": user})
 
 
 def test_set_rebalance_tolerance_acl(

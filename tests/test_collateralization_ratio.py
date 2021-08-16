@@ -47,7 +47,7 @@ def test_lower_ratio_inside_rebalancing_band_should_not_take_more_debt(
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(strategy)
 
-    new_ratio = strategy.collateralizationRatio() - strategy.rebalanceTolerance() + 1
+    new_ratio = strategy.collateralizationRatio() - strategy.rebalanceTolerance() * 0.99
     strategy.setCollateralizationRatio(new_ratio)
 
     # Adjust the position
@@ -103,7 +103,10 @@ def test_higher_ratio_inside_rebalancing_band_should_not_repay_debt(
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(test_strategy)
 
-    new_ratio = test_strategy.collateralizationRatio() + test_strategy.rebalanceTolerance() - 1
+    new_ratio = (
+        test_strategy.collateralizationRatio()
+        + test_strategy.rebalanceTolerance() * 0.99
+    )
     test_strategy.setCollateralizationRatio(new_ratio)
 
     assert test_strategy.tendTrigger(1) == False
@@ -129,7 +132,7 @@ def test_vault_ratio_calculation_on_withdraw(
 
     # Collateral ratio should be the target ratio set
     assert (
-        test_strategy._getCurrentMakerVaultRatio()
+        pytest.approx(test_strategy._getCurrentMakerVaultRatio(), rel=RELATIVE_APPROX)
         == test_strategy.collateralizationRatio()
     )
 
@@ -150,7 +153,7 @@ def test_vault_ratio_calculation_on_withdraw(
     )
 
 
-def test_tend_trigger_conditions(vault, strategy, token, amount, user, RELATIVE_APPROX):
+def test_tend_trigger_conditions(vault, strategy, token, amount, user):
     # Initial ratio is 0 because there is no collateral locked
     assert strategy.tendTrigger(1) == False
 
@@ -167,17 +170,17 @@ def test_tend_trigger_conditions(vault, strategy, token, amount, user, RELATIVE_
     assert strategy.tendTrigger(1) == False
 
     # Going over the rebalancing band should need to adjust position
-    strategy.setCollateralizationRatio(orig_target + rebalance_tolerance + 1)
+    strategy.setCollateralizationRatio(orig_target + rebalance_tolerance * 1.001)
     assert strategy.tendTrigger(1) == True
 
     # Going over the target ratio but inside rebalancing band should not adjust position
-    strategy.setCollateralizationRatio(orig_target + rebalance_tolerance - 1)
+    strategy.setCollateralizationRatio(orig_target + rebalance_tolerance * 0.999)
     assert strategy.tendTrigger(1) == False
 
     # Going under the rebalancing band should need to adjust position
-    strategy.setCollateralizationRatio(orig_target - rebalance_tolerance - 1)
+    strategy.setCollateralizationRatio(orig_target - rebalance_tolerance * 1.001)
     assert strategy.tendTrigger(1) == True
 
     # Going under the target ratio but inside rebalancing band should not adjust position
-    strategy.setCollateralizationRatio(orig_target - rebalance_tolerance + 1)
+    strategy.setCollateralizationRatio(orig_target - rebalance_tolerance * 0.999)
     assert strategy.tendTrigger(1) == False

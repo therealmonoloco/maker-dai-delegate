@@ -238,7 +238,7 @@ contract Strategy is BaseStrategy {
         } else if (
             currentRatio > collateralizationRatio.add(rebalanceTolerance)
         ) {
-            _mintMoreInvestmentToken(currentRatio);
+            _mintMoreInvestmentToken();
         }
 
         // If we have anything left to invest then deposit into the yVault
@@ -314,20 +314,16 @@ contract Strategy is BaseStrategy {
         _repayInvestmentTokenDebt(amountToRepay);
     }
 
-    function _mintMoreInvestmentToken(uint256 currentRatio) internal {
-        // Make sure we are above the desired collateralization ratio
-        if (currentRatio < collateralizationRatio) {
-            return;
-        }
+    // Mint the maximum DAI possible for the locked collateral
+    function _mintMoreInvestmentToken() internal {
+        uint256 price = _getWantTokenPrice();
+        uint256 amount = balanceOfMakerVault();
 
-        // current_debt = collateral_value / current_ratio
-        // we want new_debt > current_debt for the same collateral value
-        // new_debt = current_debt * current_ratio / desired_ratio
-        // and the amount to mint is the difference between current_debt and new_debt
-        uint256 newDebt =
-            balanceOfDebt().mul(currentRatio).div(collateralizationRatio);
+        uint256 daiToMint =
+            amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
 
-        uint256 daiToMint = newDebt.sub(balanceOfDebt());
+        daiToMint = daiToMint.sub(balanceOfDebt());
+
         _lockGemAndDraw(0, daiToMint);
     }
 
@@ -638,7 +634,8 @@ contract Strategy is BaseStrategy {
             balanceOfMakerVault().mul(price).div(WAD);
         uint256 totalDebt = balanceOfDebt();
 
-        // If for some reason we do not have debt, make sure the operation does not revert
+        // If for some reason we do not have debt (e.g: deposits under dust)
+        // make sure the operation does not revert
         if (totalDebt == 0) {
             totalDebt = 1;
         }

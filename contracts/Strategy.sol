@@ -321,7 +321,6 @@ contract Strategy is BaseStrategy {
 
         uint256 daiToMint =
             amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
-
         daiToMint = daiToMint.sub(balanceOfDebt());
 
         _lockGemAndDraw(0, daiToMint);
@@ -786,22 +785,24 @@ contract Strategy is BaseStrategy {
         (uint256 Art, uint256 rate, , uint256 line, uint256 dust) =
             vat.ilks(ilk);
 
-        // Total debt in rad (wad * ray)
+        // Total debt in [rad] (wad * ray)
         uint256 vatDebt = Art.mul(rate);
 
-        // If current debt exceeds ceiling then no more DAI is available to mint
-        if (vatDebt > line) {
-            return 0;
-        }
-
-        // If resulting debt is under debt floor, do not mint any DAI
-        // or the transaction will revert with Vat/dust message
-        // Make comparison in [wad]
-        if (desiredAmount.add(balanceOfDebt()) <= dust.div(RAY)) {
+        // Make sure we are not over debt ceiling (line) or under debt floor (dust)
+        if (
+            vatDebt >= line ||
+            (desiredAmount.add(balanceOfDebt()) <= dust.div(RAY))
+        ) {
             return 0;
         }
 
         uint256 maxMintableDAI = line.sub(vatDebt).div(RAY);
+
+        // Prevent rounding errors
+        if (maxMintableDAI > WAD) {
+            maxMintableDAI = maxMintableDAI - 1;
+        }
+
         return Math.min(maxMintableDAI, desiredAmount);
     }
 

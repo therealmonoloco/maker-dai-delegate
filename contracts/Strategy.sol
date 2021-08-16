@@ -610,10 +610,6 @@ contract Strategy is BaseStrategy {
         _checkAllowance(address(gemJoinAdapter), address(want), amount);
 
         uint256 price = _getWantTokenPrice();
-
-        // Both `amount` and `price` are in wad, therefore amount.mul(price).div(WAD) is the total USD value
-        // This represents 100% of the collateral value in USD, so we divide by the collateralization ratio (expressed in %)
-        // and multiply by 100 to correct the offset
         uint256 daiToMint =
             amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
 
@@ -761,10 +757,6 @@ contract Strategy is BaseStrategy {
             daiToMint = _forceMintWithinLimits(daiToMint);
         }
 
-        if (collateralAmount == 0 && daiToMint == 0) {
-            return;
-        }
-
         address urn = cdpManager.urns(cdpId);
 
         // Takes token amount from the strategy and joins into the vat
@@ -807,18 +799,15 @@ contract Strategy is BaseStrategy {
             return 0;
         }
 
-        uint256 maxMintableDai = line.sub(vatDebt);
-
-        // If available debt is below the floor set by `dust` then no more DAI can be minted
-        if (maxMintableDai < dust) {
+        // If resulting debt is under debt floor, do not mint any DAI
+        // or the transaction will revert with Vat/dust message
+        // Make comparison in [wad]
+        if (desiredAmount.add(balanceOfDebt()) <= dust.div(RAY)) {
             return 0;
         }
 
-        // Convert max amount of DAI to mint from [rad] to [wad]
-        maxMintableDai = maxMintableDai.div(1e27);
-
-        // Return available debt to be minted
-        return Math.min(maxMintableDai, desiredAmount);
+        uint256 maxMintableDAI = line.sub(vatDebt).div(RAY);
+        return Math.min(maxMintableDAI, desiredAmount);
     }
 
     function _debtFloor() internal returns (uint256) {

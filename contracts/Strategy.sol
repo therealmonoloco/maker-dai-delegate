@@ -617,10 +617,6 @@ contract Strategy is BaseStrategy {
 
         // Lock collateral and mint DAI
         _lockGemAndDraw(amount, daiToMint);
-
-        // Send DAI to yvDAI
-        _checkAllowance(address(yVault), yVault.token(), daiToMint);
-        yVault.deposit();
     }
 
     // ----------------- INTERNAL CALCS -----------------.

@@ -265,8 +265,11 @@ contract Strategy is BaseStrategy {
     }
 
     function _repayDebt(uint256 currentRatio) internal {
+        uint256 currentDebt = balanceOfDebt();
+
         // Nothing to repay if we are over the collateralization ratio
-        if (currentRatio > collateralizationRatio) {
+        // or there is no debt
+        if (currentRatio > collateralizationRatio || currentDebt == 0) {
             return;
         }
 
@@ -276,7 +279,6 @@ contract Strategy is BaseStrategy {
         // so that new_debt * desired_ratio = current_debt * current_ratio
         // new_debt = current_debt * current_ratio / desired_ratio
         // and the amount to repay is the difference between current_debt and new_debt
-        uint256 currentDebt = balanceOfDebt();
         uint256 newDebt =
             currentDebt.mul(currentRatio).div(collateralizationRatio);
 

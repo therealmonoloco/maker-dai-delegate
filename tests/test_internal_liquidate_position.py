@@ -91,13 +91,13 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
 
     token_price = test_strategy._getPrice()
 
-    # Cannot have more than dust * collateralization ratio (~25,000 DAI)
+    # Cannot take more than dust * (collateralization ratio - tolerance) (~25,000 DAI)
     # of collateral unless we pay the full debt.
     # Here we are leaving it behind, so it's a 25k "loss" priced in want
     min_locked_collateral_for_debt_floor = (
         Wei("10_000 ether")
         / token_price
-        * test_strategy.collateralizationRatio()  # already in wad
+        * (test_strategy.collateralizationRatio() - test_strategy.rebalanceTolerance())  # already in wad
     )
 
     (_liquidatedAmount, _loss) = test_strategy._liquidatePosition(amount).return_value

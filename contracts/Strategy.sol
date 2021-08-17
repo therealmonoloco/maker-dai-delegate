@@ -368,26 +368,21 @@ contract Strategy is BaseStrategy {
 
         // If we are liquidating all positions and were not able to pay the debt in full,
         // we may need to unlock some collateral to sell
-        if (newRatio == 0 && balanceOfDebt() > 0) {
-            // If we do not intend to leave debt behind, then we calculate the amount of
-            // want to sell and exchange it for the investment token in order to repay
-            // the debt in full
-            if (!leaveDebtBehind) {
-                uint256 currentInvestmentValue = _valueOfInvestment();
+        if (newRatio == 0 && balanceOfDebt() > 0 && !leaveDebtBehind) {
+            uint256 currentInvestmentValue = _valueOfInvestment();
 
-                // Very small numbers may round to 0 'want' to use for buying investment token
-                // Enforce a minimum of $1 to swap in order to avoid this
-                uint256 investmentLeftToAcquire =
-                    balanceOfDebt().add(1e18).sub(currentInvestmentValue);
+            // Very small numbers may round to 0 'want' to use for buying investment token
+            // Enforce a minimum of $1 to swap in order to avoid this
+            uint256 investmentLeftToAcquire =
+                balanceOfDebt().add(1e18).sub(currentInvestmentValue);
 
-                uint256 investmentLeftToAcquireInWant =
-                    investmentLeftToAcquire.mul(WAD).div(price);
+            uint256 investmentLeftToAcquireInWant =
+                investmentLeftToAcquire.mul(WAD).div(price);
 
-                if (investmentLeftToAcquireInWant <= balanceOfWant()) {
-                    _buyInvestmentTokenWithWant(investmentLeftToAcquire);
-                    _repayDebt(0);
-                    _wipeAndFreeGem(balanceOfMakerVault(), 0);
-                }
+            if (investmentLeftToAcquireInWant <= balanceOfWant()) {
+                _buyInvestmentTokenWithWant(investmentLeftToAcquire);
+                _repayDebt(0);
+                _wipeAndFreeGem(balanceOfMakerVault(), 0);
             }
         }
 

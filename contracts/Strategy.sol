@@ -362,12 +362,13 @@ contract Strategy is BaseStrategy {
         // Attempt to repay necessary debt to restore the target collateralization ratio
         _repayDebt(newRatio);
 
+        // Unlock as much collateral as possible while keeping the target ratio
+        amountToFree = Math.min(amountToFree, _maxWithdrawal());
+        _wipeAndFreeGem(amountToFree, 0);
+
         // If we are liquidating all positions and were not able to pay the debt in full,
         // we may need to unlock some collateral to sell
         if (newRatio == 0 && balanceOfDebt() > 0) {
-            // Unlock as much collateral as possible while keeping the target ratio
-            _wipeAndFreeGem(_maxWithdrawal(), 0);
-
             // If we do not intend to leave debt behind, then we calculate the amount of
             // want to sell and exchange it for the investment token in order to repay
             // the debt in full
@@ -388,8 +389,6 @@ contract Strategy is BaseStrategy {
                     _wipeAndFreeGem(balanceOfMakerVault(), 0);
                 }
             }
-        } else {
-            _wipeAndFreeGem(amountToFree, 0);
         }
 
         uint256 totalAssets = balanceOfWant();

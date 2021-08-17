@@ -148,13 +148,13 @@ def test_withdraw_everything_cancels_entire_debt(
 
 
 def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
-    vault, test_strategy, token, token_whale, gov
+    vault, test_strategy, token, token_whale, gov, yvault
 ):
     # Make sure the strategy will not sell want to repay debt
     test_strategy.setLeaveDebtBehind(False, {"from": gov})
 
     price = test_strategy._getPrice()
-    floor = Wei("10_001 ether")  # assume a price floor of 10k as in YFI-A
+    floor = Wei("10_100 ether")  # assume a price floor of 10k as in YFI-A
 
     # Amount in want that generates 'floor' debt minus a treshold
     token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (
@@ -174,7 +174,12 @@ def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
     chain.sleep(1)
     test_strategy.harvest()
 
-    max_withdrawal = token_floor - min_floor_in_band - 100
+    max_withdrawal = token_floor - min_floor_in_band - Wei("0.0001 ether")
+
+    # Simulate a loss in yvault by sending some shares away
+    yvault.transfer(
+        token_whale, yvault.balanceOf(test_strategy) * 0.01, {"from": test_strategy}
+    )
 
     assert (
         vault.withdraw(max_withdrawal, {"from": token_whale}).return_value
@@ -184,7 +189,7 @@ def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
     # We are not simulating any profit in yVault, so there will not
     # be enough to repay the debt
     with reverts():
-        vault.withdraw(Wei("0.001 ether"), {"from": token_whale})
+        vault.withdraw(Wei("0.01 ether"), {"from": token_whale})
 
 
 def test_small_withdraw_cancels_corresponding_debt(

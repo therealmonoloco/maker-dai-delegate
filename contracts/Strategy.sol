@@ -416,10 +416,14 @@ contract Strategy is BaseStrategy {
         uint256 price = _getWantTokenPrice();
 
         // Min collateral in want that needs to be locked with the outstanding debt
+        // Allow going to the lower rebalancing band
         uint256 minCollateral =
-            collateralizationRatio.mul(totalDebt).mul(WAD).div(price).div(
-                MAX_BPS
-            );
+            collateralizationRatio
+                .sub(rebalanceTolerance)
+                .mul(totalDebt)
+                .mul(WAD)
+                .div(price)
+                .div(MAX_BPS);
 
         // If we are under collateralized then it is not safe for us to withdraw anything
         if (minCollateral > totalCollateral) {

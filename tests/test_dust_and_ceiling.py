@@ -1,6 +1,6 @@
 import pytest
 
-from brownie import chain, Wei
+from brownie import chain, reverts, Wei
 
 
 def test_small_deposit_does_not_generate_debt_under_floor(
@@ -125,17 +125,88 @@ def test_large_deposit_does_not_generate_debt_over_ceiling(
     )
 
 
-def test_withdraw_everything_cancels_entire_debt():
-    pass
+def test_withdraw_everything_cancels_entire_debt(
+    vault, test_strategy, token, token_whale, user, amount
+):
+    amount_user = Wei("0.25 ether")
+    amount_whale = Wei("10 ether")
+
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(amount_whale, {"from": token_whale})
+
+    token.approve(vault.address, 2 ** 256 - 1, {"from": user})
+    vault.deposit(amount_user, {"from": user})
+
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    assert vault.withdraw({"from": token_whale}).return_value == amount_whale
+    assert vault.withdraw({"from": user}).return_value == amount_user
+    assert vault.strategies(test_strategy).dict()["totalDebt"] == 0
+    assert test_strategy.estimatedTotalAssets() == 0
 
 
-def test_withdraw_under_floor_cancels_entire_debt_if_possible():
-    pass
+def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
+    vault, test_strategy, token, token_whale, gov
+):
+    # Make sure the strategy will not sell want to repay debt
+    test_strategy.setLeaveDebtBehind(False, {"from": gov})
+
+    price = test_strategy._getPrice()
+    floor = Wei("10_001 ether")  # assume a price floor of 10k as in YFI-A
+
+    # Amount in want that generates 'floor' debt minus a treshold
+    token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (
+        10 ** token.decimals()
+    )
+
+    lower_rebalancing_bound = (
+        test_strategy.collateralizationRatio() - test_strategy.rebalanceTolerance()
+    )
+    min_floor_in_band = (
+        token_floor * lower_rebalancing_bound / test_strategy.collateralizationRatio()
+    )
+
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(token_floor, {"from": token_whale})
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    max_withdrawal = token_floor - min_floor_in_band - 100
+
+    assert (
+        vault.withdraw(max_withdrawal, {"from": token_whale}).return_value
+        == max_withdrawal
+    )
+
+    # We are not simulating any profit in yVault, so there will not
+    # be enough to repay the debt
+    with reverts():
+        vault.withdraw(Wei("0.001 ether"), {"from": token_whale})
 
 
-def test_withdraw_under_floor_needs_to_sell_want_to_cancel_debt():
-    pass
+def test_small_withdraw_cancels_corresponding_debt(
+    vault, strategy, token, token_whale, yvault, RELATIVE_APPROX
+):
+    amount = Wei("10 ether")
+    to_withdraw_pct = 0.2
 
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(amount, {"from": token_whale})
+    chain.sleep(1)
+    strategy.harvest()
 
-def test_small_withdraw_cancels_corresponding_debt():
-    pass
+    # Shares in yVault at the current target ratio
+    shares_before = yvault.balanceOf(strategy)
+
+    assert (
+        vault.withdraw(amount * to_withdraw_pct, {"from": token_whale}).return_value
+        == amount * to_withdraw_pct
+    )
+
+    assert pytest.approx(
+        shares_before * (1 - to_withdraw_pct), rel=RELATIVE_APPROX
+    ) == yvault.balanceOf(strategy)

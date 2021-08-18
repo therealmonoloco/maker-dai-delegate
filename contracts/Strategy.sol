@@ -372,7 +372,11 @@ contract Strategy is BaseStrategy {
 
         // If we are liquidating all positions and were not able to pay the debt in full,
         // we may need to unlock some collateral to sell
-        if (newRatio == 0 && balanceOfDebt() > 0 && !leaveDebtBehind) {
+        if (
+            _amountNeeded > amountToFree &&
+            balanceOfDebt() > 0 &&
+            !leaveDebtBehind
+        ) {
             uint256 currentInvestmentValue = _valueOfInvestment();
 
             // Very small numbers may round to 0 'want' to use for buying investment token

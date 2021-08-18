@@ -74,7 +74,7 @@ def test_deposit_after_passing_debt_floor_generates_debt(
 
 
 def test_withdraw_does_not_leave_debt_under_floor(
-    vault, test_strategy, token, token_whale, yvault
+    vault, test_strategy, token, token_whale, yvault, dai, dai_whale, RELATIVE_APPROX
 ):
     # Deposit to the vault and send funds through the strategy
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
@@ -85,12 +85,19 @@ def test_withdraw_does_not_leave_debt_under_floor(
     # We took some debt and deposited into yvDAI
     assert yvault.balanceOf(test_strategy) > 0
 
+    # Send profits to yVault
+    dai.transfer(yvault, yvault.totalAssets() * 0.03, {"from": dai_whale})
+
+    shares = yvault.balanceOf(test_strategy)
+
     # Withdraw large amount so remaining debt is under floor
     vault.withdraw(Wei("9.9 ether"), {"from": token_whale})
 
     # Almost all yvDAI shares should have been used to repay the debt
     # and avoid the floor
-    assert yvault.balanceOf(test_strategy) / 1e18 < 0.1
+    assert pytest.approx(yvault.balanceOf(test_strategy), RELATIVE_APPROX) == (
+        shares - shares * (1 / 1.03)
+    )
 
     # Because collateral balance is much larger than the debt (currently 0)
     # we expect the current ratio to be above target
@@ -125,8 +132,18 @@ def test_large_deposit_does_not_generate_debt_over_ceiling(
     )
 
 
+# Fixture 'amount' is included so user has some balance
 def test_withdraw_everything_cancels_entire_debt(
-    vault, test_strategy, token, token_whale, user, amount
+    vault,
+    test_strategy,
+    token,
+    token_whale,
+    user,
+    amount,
+    yvault,
+    dai,
+    dai_whale,
+    RELATIVE_APPROX,
 ):
     amount_user = Wei("0.25 ether")
     amount_whale = Wei("10 ether")
@@ -141,10 +158,12 @@ def test_withdraw_everything_cancels_entire_debt(
     chain.sleep(1)
     test_strategy.harvest()
 
+    # Send profits to yVault
+    dai.transfer(yvault, yvault.totalAssets() * 0.00001, {"from": dai_whale})
+
     assert vault.withdraw({"from": token_whale}).return_value == amount_whale
     assert vault.withdraw({"from": user}).return_value == amount_user
     assert vault.strategies(test_strategy).dict()["totalDebt"] == 0
-    assert test_strategy.estimatedTotalAssets() == 0
 
 
 def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(

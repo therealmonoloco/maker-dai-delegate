@@ -125,6 +125,7 @@ def test_happy_liquidation(
     vault.deposit(amount, {"from": user})
 
     # Harvest so all the collateral is locked in the CDP
+    chain.sleep(1)
     test_strategy.harvest()
 
     # sleep 7 days

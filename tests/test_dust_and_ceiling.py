@@ -95,9 +95,7 @@ def test_withdraw_does_not_leave_debt_under_floor(
 
     # Almost all yvDAI shares should have been used to repay the debt
     # and avoid the floor
-    assert pytest.approx(yvault.balanceOf(test_strategy), RELATIVE_APPROX) == (
-        shares - shares * (1 / 1.03)
-    )
+    assert (yvault.balanceOf(test_strategy) - (shares - shares * (1 / 1.03))) < 1e18
 
     # Because collateral balance is much larger than the debt (currently 0)
     # we expect the current ratio to be above target
@@ -208,7 +206,7 @@ def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
     # We are not simulating any profit in yVault, so there will not
     # be enough to repay the debt
     with reverts():
-        vault.withdraw(Wei("0.01 ether"), {"from": token_whale})
+        vault.withdraw({"from": token_whale})
 
 
 def test_small_withdraw_cancels_corresponding_debt(

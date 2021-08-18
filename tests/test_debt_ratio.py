@@ -8,6 +8,7 @@ def test_increase(
     vault.deposit(20 * (10 ** token.decimals()), {"from": token_whale})
     vault.updateStrategyDebtRatio(strategy, 5_000, {"from": gov})
 
+    chain.sleep(1)
     strategy.harvest({"from": gov})
     assert vault.strategies(strategy).dict()["totalDebt"] == 10 * (
         10 ** token.decimals()
@@ -16,6 +17,8 @@ def test_increase(
     borrow_token.transfer(
         yvault, 200 * (10 ** borrow_token.decimals()), {"from": borrow_whale}
     )
+
+    chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(60 * 60 * 24 * 2)
     chain.mine(1)
@@ -32,11 +35,13 @@ def test_decrease(vault, strategy, gov, token, token_whale):
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(20 * (10 ** token.decimals()), {"from": token_whale})
 
+    chain.sleep(1)
     strategy.harvest({"from": gov})
     assert vault.strategies(strategy).dict()["totalDebt"] == 20 * (
         10 ** token.decimals()
     )
 
+    chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(60 * 60 * 24 * 2)
     chain.mine(1)

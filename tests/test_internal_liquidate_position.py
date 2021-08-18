@@ -110,7 +110,10 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
         pytest.approx(_loss, rel=RELATIVE_APPROX)
         == min_locked_collateral_for_debt_floor
     )
-    assert test_strategy.estimatedTotalAssets() == amount
+    assert (
+        pytest.approx(test_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
+        == amount
+    )
 
 
 # In this test the strategy has enough profit to close the whole position

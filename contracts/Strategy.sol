@@ -165,11 +165,15 @@ contract Strategy is BaseStrategy {
     }
 
     function delegatedAssets() external view override returns (uint256) {
-        return _valueOfInvestment().mul(WAD).div(_getWantTokenPrice());
+        return _convertInvestmentTokenToWant(_valueOfInvestment());
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant().add(balanceOfMakerVault());
+        return
+            balanceOfWant()
+                .add(balanceOfMakerVault())
+                .add(_convertInvestmentTokenToWant(_valueOfInvestment()))
+                .sub(_convertInvestmentTokenToWant(balanceOfDebt()));
     }
 
     function prepareReturn(uint256 _debtOutstanding)
@@ -377,7 +381,7 @@ contract Strategy is BaseStrategy {
                 balanceOfDebt().add(1e18).sub(currentInvestmentValue);
 
             uint256 investmentLeftToAcquireInWant =
-                investmentLeftToAcquire.mul(WAD).div(price);
+                _convertInvestmentTokenToWant(investmentLeftToAcquire);
 
             if (investmentLeftToAcquireInWant <= balanceOfWant()) {
                 _buyInvestmentTokenWithWant(investmentLeftToAcquire);
@@ -393,6 +397,14 @@ contract Strategy is BaseStrategy {
         } else {
             _liquidatedAmount = _amountNeeded;
         }
+    }
+
+    function _convertInvestmentTokenToWant(uint256 amount)
+        internal
+        view
+        returns (uint256)
+    {
+        return amount.mul(WAD).div(_getWantTokenPrice());
     }
 
     // Returns maximum collateral to withdraw while maintaining the target collateralization ratio

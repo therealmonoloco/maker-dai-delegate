@@ -172,6 +172,7 @@ contract Strategy is BaseStrategy {
         return
             balanceOfWant()
                 .add(balanceOfMakerVault())
+                .add(_convertInvestmentTokenToWant(balanceOfInvestmentToken()))
                 .add(_convertInvestmentTokenToWant(_valueOfInvestment()))
                 .sub(_convertInvestmentTokenToWant(balanceOfDebt()));
     }

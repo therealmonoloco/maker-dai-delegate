@@ -259,78 +259,6 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    // Make sure we update some key content in Maker contracts
-    // These can be updated by anyone without authenticating
-    function _keepBasicMakerHygiene() internal {
-        // Update accumulated stability fees
-        jug.drip(ilk);
-
-        // Update the debt ceiling using DSS Auto Line
-        autoLine.exec(ilk);
-    }
-
-    function _repayDebt(uint256 currentRatio) internal {
-        uint256 currentDebt = balanceOfDebt();
-
-        // Nothing to repay if we are over the collateralization ratio
-        // or there is no debt
-        if (currentRatio > collateralizationRatio || currentDebt == 0) {
-            return;
-        }
-
-        // ratio = collateral / debt
-        // collateral = current_ratio * current_debt
-        // collateral amount is invariant here so we want to find new_debt
-        // so that new_debt * desired_ratio = current_debt * current_ratio
-        // new_debt = current_debt * current_ratio / desired_ratio
-        // and the amount to repay is the difference between current_debt and new_debt
-        uint256 newDebt =
-            currentDebt.mul(currentRatio).div(collateralizationRatio);
-
-        uint256 amountToRepay;
-
-        // Maker will revert if the outstanding debt is less than a debt floor
-        // called 'dust'. If we are there we need to either pay the debt in full
-        // or leave at least 'dust' balance (10,000 DAI for YFI-A)
-        uint256 debtFloor = _debtFloor();
-        if (newDebt <= debtFloor) {
-            // If we sold want to repay debt we will have DAI readily available in the strategy
-            // This means we need to count both yvDAI shares and current DAI balance
-            uint256 totalInvestmentAvailableToRepay =
-                _valueOfInvestment().add(balanceOfInvestmentToken());
-
-            if (totalInvestmentAvailableToRepay >= currentDebt) {
-                // Pay the entire debt if we have enough investment token
-                amountToRepay = currentDebt;
-            } else {
-                // Pay just 0.1 cent above debtFloor (best effort without liquidating want)
-                amountToRepay = currentDebt.sub(debtFloor).sub(1e15);
-            }
-        } else {
-            // If we are not near the debt floor then just pay the exact amount
-            // needed to obtain a healthy collateralization ratio
-            amountToRepay = currentDebt.sub(newDebt);
-        }
-
-        uint256 balanceIT = balanceOfInvestmentToken();
-        if (amountToRepay > balanceIT) {
-            _withdrawFromYVault(amountToRepay.sub(balanceIT));
-        }
-        _repayInvestmentTokenDebt(amountToRepay);
-    }
-
-    // Mint the maximum DAI possible for the locked collateral
-    function _mintMoreInvestmentToken() internal {
-        uint256 price = _getWantTokenPrice();
-        uint256 amount = balanceOfMakerVault();
-
-        uint256 daiToMint =
-            amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
-        daiToMint = daiToMint.sub(balanceOfDebt());
-
-        _lockGemAndDraw(0, daiToMint);
-    }
-
     function liquidatePosition(uint256 _amountNeeded)
         internal
         override
@@ -404,47 +332,6 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function _convertInvestmentTokenToWant(uint256 amount)
-        internal
-        view
-        returns (uint256)
-    {
-        return amount.mul(WAD).div(_getWantTokenPrice());
-    }
-
-    // Returns maximum collateral to withdraw while maintaining the target collateralization ratio
-    function _maxWithdrawal() internal view returns (uint256) {
-        // Denominated in want
-        uint256 totalCollateral = balanceOfMakerVault();
-
-        // Denominated in investment token
-        uint256 totalDebt = balanceOfDebt();
-
-        // If there is no debt to repay we can withdraw all the locked collateral
-        if (totalDebt == 0) {
-            return totalCollateral;
-        }
-
-        uint256 price = _getWantTokenPrice();
-
-        // Min collateral in want that needs to be locked with the outstanding debt
-        // Allow going to the lower rebalancing band
-        uint256 minCollateral =
-            collateralizationRatio
-                .sub(rebalanceTolerance)
-                .mul(totalDebt)
-                .mul(WAD)
-                .div(price)
-                .div(MAX_BPS);
-
-        // If we are under collateralized then it is not safe for us to withdraw anything
-        if (minCollateral > totalCollateral) {
-            return 0;
-        }
-
-        return totalCollateral.sub(minCollateral);
-    }
-
     function liquidateAllPositions()
         internal
         override
@@ -509,6 +396,78 @@ contract Strategy is BaseStrategy {
     }
 
     // ----------------- INTERNAL FUNCTIONS SUPPORT -----------------
+
+    // Make sure we update some key content in Maker contracts
+    // These can be updated by anyone without authenticating
+    function _keepBasicMakerHygiene() internal {
+        // Update accumulated stability fees
+        jug.drip(ilk);
+
+        // Update the debt ceiling using DSS Auto Line
+        autoLine.exec(ilk);
+    }
+
+    function _repayDebt(uint256 currentRatio) internal {
+        uint256 currentDebt = balanceOfDebt();
+
+        // Nothing to repay if we are over the collateralization ratio
+        // or there is no debt
+        if (currentRatio > collateralizationRatio || currentDebt == 0) {
+            return;
+        }
+
+        // ratio = collateral / debt
+        // collateral = current_ratio * current_debt
+        // collateral amount is invariant here so we want to find new_debt
+        // so that new_debt * desired_ratio = current_debt * current_ratio
+        // new_debt = current_debt * current_ratio / desired_ratio
+        // and the amount to repay is the difference between current_debt and new_debt
+        uint256 newDebt =
+            currentDebt.mul(currentRatio).div(collateralizationRatio);
+
+        uint256 amountToRepay;
+
+        // Maker will revert if the outstanding debt is less than a debt floor
+        // called 'dust'. If we are there we need to either pay the debt in full
+        // or leave at least 'dust' balance (10,000 DAI for YFI-A)
+        uint256 debtFloor = _debtFloor();
+        if (newDebt <= debtFloor) {
+            // If we sold want to repay debt we will have DAI readily available in the strategy
+            // This means we need to count both yvDAI shares and current DAI balance
+            uint256 totalInvestmentAvailableToRepay =
+                _valueOfInvestment().add(balanceOfInvestmentToken());
+
+            if (totalInvestmentAvailableToRepay >= currentDebt) {
+                // Pay the entire debt if we have enough investment token
+                amountToRepay = currentDebt;
+            } else {
+                // Pay just 0.1 cent above debtFloor (best effort without liquidating want)
+                amountToRepay = currentDebt.sub(debtFloor).sub(1e15);
+            }
+        } else {
+            // If we are not near the debt floor then just pay the exact amount
+            // needed to obtain a healthy collateralization ratio
+            amountToRepay = currentDebt.sub(newDebt);
+        }
+
+        uint256 balanceIT = balanceOfInvestmentToken();
+        if (amountToRepay > balanceIT) {
+            _withdrawFromYVault(amountToRepay.sub(balanceIT));
+        }
+        _repayInvestmentTokenDebt(amountToRepay);
+    }
+
+    // Mint the maximum DAI possible for the locked collateral
+    function _mintMoreInvestmentToken() internal {
+        uint256 price = _getWantTokenPrice();
+        uint256 amount = balanceOfMakerVault();
+
+        uint256 daiToMint =
+            amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
+        daiToMint = daiToMint.sub(balanceOfDebt());
+
+        _lockGemAndDraw(0, daiToMint);
+    }
 
     function _withdrawFromYVault(uint256 _amountIT) internal returns (uint256) {
         if (_amountIT == 0) {
@@ -594,26 +553,6 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function _getWantTokenPrice() internal view returns (uint256) {
-        uint256 minPrice;
-
-        // Assume we are white-listed in the OSM
-        (uint256 current, bool isCurrentValid) = YFItoUSDOSMProxy.peek();
-        (uint256 future, bool isFutureValid) = YFItoUSDOSMProxy.peep();
-        if (isCurrentValid && isFutureValid) {
-            minPrice = Math.min(future, current);
-        }
-
-        // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
-        uint256 chainLinkPrice =
-            uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
-
-        // Return the worst price available
-        minPrice = Math.min(minPrice, chainLinkPrice);
-        require(minPrice > 0);
-        return minPrice;
-    }
-
     function _depositToMakerVault(uint256 amount) internal {
         if (amount == 0) {
             return;
@@ -629,34 +568,40 @@ contract Strategy is BaseStrategy {
         _lockGemAndDraw(amount, daiToMint);
     }
 
-    // ----------------- INTERNAL CALCS -----------------.
+    // Returns maximum collateral to withdraw while maintaining the target collateralization ratio
+    function _maxWithdrawal() internal view returns (uint256) {
+        // Denominated in want
+        uint256 totalCollateral = balanceOfMakerVault();
 
-    function getCurrentMakerVaultRatio() internal view returns (uint256) {
-        // spot: collateral price with safety margin returned in [ray]
-        (, , uint256 spot, , ) = vat.ilks(ilk);
-
-        // Liquidation ratio for the given ilk returned in [ray]
-        // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
-        (, uint256 liquidationRatio) = spotter.ilks(ilk);
-
-        // Use pessimistic price to determine the worst ratio possible
-        uint256 price = spot.mul(liquidationRatio).div(RAY * 1e9); // convert ray*ray --> wad
-
-        price = Math.min(price, _getWantTokenPrice());
-
-        uint256 totalCollateralValue =
-            balanceOfMakerVault().mul(price).div(WAD);
+        // Denominated in investment token
         uint256 totalDebt = balanceOfDebt();
 
-        // If for some reason we do not have debt (e.g: deposits under dust)
-        // make sure the operation does not revert
+        // If there is no debt to repay we can withdraw all the locked collateral
         if (totalDebt == 0) {
-            totalDebt = 1;
+            return totalCollateral;
         }
 
-        uint256 ratio = totalCollateralValue.mul(MAX_BPS).div(totalDebt);
-        return ratio;
+        uint256 price = _getWantTokenPrice();
+
+        // Min collateral in want that needs to be locked with the outstanding debt
+        // Allow going to the lower rebalancing band
+        uint256 minCollateral =
+            collateralizationRatio
+                .sub(rebalanceTolerance)
+                .mul(totalDebt)
+                .mul(WAD)
+                .div(price)
+                .div(MAX_BPS);
+
+        // If we are under collateralized then it is not safe for us to withdraw anything
+        if (minCollateral > totalCollateral) {
+            return 0;
+        }
+
+        return totalCollateral.sub(minCollateral);
     }
+
+    // ----------------- INTERNAL CALCS -----------------
 
     function balanceOfWant() internal view returns (uint256) {
         return want.balanceOf(address(this));
@@ -686,6 +631,53 @@ contract Strategy is BaseStrategy {
         return ink;
     }
 
+    function _getWantTokenPrice() internal view returns (uint256) {
+        uint256 minPrice;
+
+        // Assume we are white-listed in the OSM
+        (uint256 current, bool isCurrentValid) = YFItoUSDOSMProxy.peek();
+        (uint256 future, bool isFutureValid) = YFItoUSDOSMProxy.peep();
+        if (isCurrentValid && isFutureValid) {
+            minPrice = Math.min(future, current);
+        }
+
+        // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
+        uint256 chainLinkPrice =
+            uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
+
+        // Return the worst price available
+        minPrice = Math.min(minPrice, chainLinkPrice);
+        require(minPrice > 0);
+        return minPrice;
+    }
+
+    function getCurrentMakerVaultRatio() internal view returns (uint256) {
+        // spot: collateral price with safety margin returned in [ray]
+        (, , uint256 spot, , ) = vat.ilks(ilk);
+
+        // Liquidation ratio for the given ilk returned in [ray]
+        // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
+        (, uint256 liquidationRatio) = spotter.ilks(ilk);
+
+        // Use pessimistic price to determine the worst ratio possible
+        uint256 price = spot.mul(liquidationRatio).div(RAY * 1e9); // convert ray*ray --> wad
+
+        price = Math.min(price, _getWantTokenPrice());
+
+        uint256 totalCollateralValue =
+            balanceOfMakerVault().mul(price).div(WAD);
+        uint256 totalDebt = balanceOfDebt();
+
+        // If for some reason we do not have debt (e.g: deposits under dust)
+        // make sure the operation does not revert
+        if (totalDebt == 0) {
+            totalDebt = 1;
+        }
+
+        uint256 ratio = totalCollateralValue.mul(MAX_BPS).div(totalDebt);
+        return ratio;
+    }
+
     function _valueOfInvestment() internal view returns (uint256) {
         return
             yVault.balanceOf(address(this)).mul(yVault.pricePerShare()).div(
@@ -702,6 +694,14 @@ contract Strategy is BaseStrategy {
     }
 
     // ----------------- TOKEN CONVERSIONS -----------------
+
+    function _convertInvestmentTokenToWant(uint256 amount)
+        internal
+        view
+        returns (uint256)
+    {
+        return amount.mul(WAD).div(_getWantTokenPrice());
+    }
 
     function getTokenOutPath(address _token_in, address _token_out)
         internal

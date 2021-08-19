@@ -383,7 +383,7 @@ contract Strategy is BaseStrategy {
             // Very small numbers may round to 0 'want' to use for buying investment token
             // Enforce a minimum of $1 to swap in order to avoid this
             uint256 investmentLeftToAcquire =
-                balanceOfDebt().add(1e18).sub(currentInvestmentValue);
+                balanceOfDebt().add(WAD).sub(currentInvestmentValue);
 
             uint256 investmentLeftToAcquireInWant =
                 _convertInvestmentTokenToWant(investmentLeftToAcquire);
@@ -505,7 +505,7 @@ contract Strategy is BaseStrategy {
     {
         // YFI price in ETH with 18 decimals
         uint256 price = uint256(chainlinkYFItoETHPriceFeed.latestAnswer());
-        return _amtInWei.mul(1e18).div(price);
+        return _amtInWei.mul(WAD).div(price);
     }
 
     // ----------------- INTERNAL FUNCTIONS SUPPORT -----------------

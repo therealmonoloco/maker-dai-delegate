@@ -116,7 +116,7 @@ contract Strategy is BaseStrategy {
 
     // ----------------- SETTERS -----------------
 
-    // Target collateralization ratio to main within bounds
+    // Target collateralization ratio to maintain within bounds
     function setCollateralizationRatio(uint256 _collateralizationRatio)
         external
         onlyEmergencyAuthorized
@@ -124,7 +124,7 @@ contract Strategy is BaseStrategy {
         collateralizationRatio = _collateralizationRatio;
     }
 
-    // Rebalancing bands (collat ratio - tolerance, collat_ratio )
+    // Rebalancing bands (collat ratio - tolerance, collat_ratio + tolerance)
     function setRebalanceTolerance(uint256 _rebalanceTolerance)
         external
         onlyEmergencyAuthorized
@@ -137,7 +137,7 @@ contract Strategy is BaseStrategy {
         maxLoss = _maxLoss;
     }
 
-    // Max slippage to accept when withdrawing from yVault
+    // If set to true the strategy will never sell want to repay debts
     function setLeaveDebtBehind(bool _leaveDebtBehind)
         external
         onlyEmergencyAuthorized
@@ -145,14 +145,14 @@ contract Strategy is BaseStrategy {
         leaveDebtBehind = _leaveDebtBehind;
     }
 
-    // Required to move funds to a new cdp and use a different cdpId after migration.
-    // Should only be called by governance as it will decide fund allocation
+    // Required to move funds to a new cdp and use a different cdpId after migration
+    // Should only be called by governance as it will move funds
     function shiftToCdp(uint256 newCdpId) external onlyGovernance {
         cdpManager.shift(cdpId, newCdpId);
         cdpId = newCdpId;
     }
 
-    // Where to route token swaps, must conform to ISwap interface
+    // Where to route token swaps
     // Access control is stricter in this method as it will be sent funds
     function setSwapRouter(ISwap _router) external onlyGovernance {
         router = _router;
@@ -224,7 +224,7 @@ contract Strategy is BaseStrategy {
         _keepBasicMakerHygiene();
 
         // If we have enough want to deposit more into the maker vault, we do it
-        // We do not skip the rest of the function as it may need to repay or take on more debt
+        // Do not skip the rest of the function as it may need to repay or take on more debt
         uint256 wantBalance = balanceOfWant();
         if (wantBalance > _debtOutstanding) {
             uint256 amountToDeposit = wantBalance.sub(_debtOutstanding);
@@ -266,7 +266,7 @@ contract Strategy is BaseStrategy {
     {
         uint256 balance = balanceOfWant();
 
-        // Can we handle it without liquidating positions?
+        // Check if we can handle it without freeing collateral
         if (balance >= _amountNeeded) {
             return (_amountNeeded, 0);
         }

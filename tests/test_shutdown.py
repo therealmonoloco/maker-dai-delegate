@@ -27,7 +27,7 @@ def test_vault_shutdown_can_withdraw(
     chain.sleep(3600 * 7)
     chain.mine(1)
 
-    assert test_strategy.estimatedTotalAssets() >= amount
+    assert test_strategy.estimatedTotalAssets() <= amount
 
     ## Set Emergency
     vault.setEmergencyShutdown(True)
@@ -85,4 +85,3 @@ def test_basic_shutdown(
 
     assert token.balanceOf(test_strategy) == 0
     assert token.balanceOf(vault) >= amount  ## The vault has all funds
-    ## NOTE: May want to tweak this based on potential loss during migration

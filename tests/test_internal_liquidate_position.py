@@ -49,7 +49,7 @@ def test_liquidate_more_than_we_have_should_report_loss(
 # We expect the recovered collateral to be a bit less than the deposited amount
 # due to Maker Stability Fees.
 def test_liquidate_position_without_enough_profit_by_selling_want(
-    chain, token, vault, test_strategy, user, amount
+    chain, token, vault, test_strategy, user, amount, yvault, token_whale
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -59,13 +59,18 @@ def test_liquidate_position_without_enough_profit_by_selling_want(
     chain.sleep(24 * 60 * 60 * 7)
     chain.mine(1)
 
+    # Simulate a loss in yvault by sending some shares away
+    yvault.transfer(
+        token_whale, yvault.balanceOf(test_strategy) * 0.01, {"from": test_strategy}
+    )
+
     # Harvest so all the collateral is locked in the CDP
     test_strategy.harvest()
 
     (_liquidatedAmount, _loss) = test_strategy._liquidatePosition(amount).return_value
     assert _liquidatedAmount + _loss == amount
     assert _loss > 0
-    assert test_strategy.estimatedTotalAssets() < amount
+    assert token.balanceOf(test_strategy) < amount
 
 
 # Same as above but this time leaveDebtBehind is set to True, so the strategy
@@ -73,7 +78,16 @@ def test_liquidate_position_without_enough_profit_by_selling_want(
 # are made and the debt set right above the floor (dust) set by Maker for YFI-A,
 # which is currently 10,000 DAI
 def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
-    chain, token, vault, test_strategy, user, gov, amount, RELATIVE_APPROX
+    chain,
+    token,
+    vault,
+    test_strategy,
+    user,
+    gov,
+    amount,
+    yvault,
+    token_whale,
+    RELATIVE_APPROX,
 ):
     # Make sure the strategy never sells any want
     test_strategy.setLeaveDebtBehind(True, {"from": gov})
@@ -102,6 +116,11 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
         )  # already in wad
     )
 
+    # Simulate a loss in yvault by sending some shares away
+    yvault.transfer(
+        token_whale, yvault.balanceOf(test_strategy) * 0.01, {"from": test_strategy}
+    )
+
     (_liquidatedAmount, _loss) = test_strategy._liquidatePosition(amount).return_value
     assert pytest.approx(_liquidatedAmount, rel=RELATIVE_APPROX) == (
         amount - min_locked_collateral_for_debt_floor
@@ -110,10 +129,15 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
         pytest.approx(_loss, rel=RELATIVE_APPROX)
         == min_locked_collateral_for_debt_floor
     )
-    assert (
-        pytest.approx(test_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
-        == amount
+    assert pytest.approx(token.balanceOf(test_strategy)) == (
+        amount - min_locked_collateral_for_debt_floor
     )
+    assert (
+        pytest.approx(token.balanceOf(test_strategy), rel=RELATIVE_APPROX)
+        == amount - min_locked_collateral_for_debt_floor
+    )
+    # Investments are worth less
+    assert test_strategy.estimatedTotalAssets() < amount
 
 
 # In this test the strategy has enough profit to close the whole position
@@ -132,7 +156,7 @@ def test_happy_liquidation(
     chain.sleep(24 * 60 * 60 * 7)
     chain.mine(1)
 
-    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.1, {"from": dai_whale})
+    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.01, {"from": dai_whale})
 
     (_liquidatedAmount, _loss) = test_strategy._liquidatePosition(amount).return_value
 

@@ -27,8 +27,6 @@ def test_vault_shutdown_can_withdraw(
     chain.sleep(3600 * 7)
     chain.mine(1)
 
-    assert test_strategy.estimatedTotalAssets() <= amount
-
     ## Set Emergency
     vault.setEmergencyShutdown(True)
 

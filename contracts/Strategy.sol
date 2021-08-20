@@ -641,9 +641,7 @@ contract Strategy is BaseStrategy {
             uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
 
         // Return the worst price available
-        minPrice = Math.min(minPrice, chainLinkPrice);
-        require(minPrice > 0);
-        return minPrice;
+        return Math.min(minPrice, chainLinkPrice);
     }
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {

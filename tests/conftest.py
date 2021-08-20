@@ -1,6 +1,5 @@
 import pytest
-from brownie import config, interface
-from brownie import Contract
+from brownie import config, interface, Contract
 
 
 @pytest.fixture(autouse=True)

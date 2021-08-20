@@ -318,10 +318,10 @@ contract Strategy is BaseStrategy {
             }
         }
 
-        uint256 totalAssets = balanceOfWant();
-        if (_amountNeeded > totalAssets) {
-            _liquidatedAmount = totalAssets;
-            _loss = _amountNeeded.sub(totalAssets);
+        uint256 looseWant = balanceOfWant();
+        if (_amountNeeded > looseWant) {
+            _liquidatedAmount = looseWant;
+            _loss = _amountNeeded.sub(looseWant);
         } else {
             _liquidatedAmount = _amountNeeded;
         }

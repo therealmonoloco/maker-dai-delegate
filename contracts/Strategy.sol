@@ -68,7 +68,8 @@ contract Strategy is BaseStrategy {
     IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
 
     // DAI token
-    IERC20 internal investmentToken;
+    IERC20 internal constant investmentToken =
+        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     // 100%
     uint256 internal constant MAX_BPS = WAD;
@@ -98,7 +99,6 @@ contract Strategy is BaseStrategy {
     bool public leaveDebtBehind;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
         vat = VatLike(cdpManager.vat());
 
@@ -378,7 +378,7 @@ contract Strategy is BaseStrategy {
         returns (address[] memory)
     {
         address[] memory protected = new address[](2);
-        protected[0] = yVault.token();
+        protected[0] = address(investmentToken);
         protected[1] = address(yVault);
         return protected;
     }

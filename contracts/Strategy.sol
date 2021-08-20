@@ -98,12 +98,14 @@ contract Strategy is BaseStrategy {
     bool public leaveDebtBehind;
 
     constructor(address _vault) public BaseStrategy(_vault) {
+        // review: why not hardcode DAI?
         investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
         vat = VatLike(cdpManager.vat());
 
         // Minimum collaterization ratio on YFI-A is 175%
         // Use 250% as target
+        // review: more decimals in 250/100 for better precision?
         collateralizationRatio = (250 * MAX_BPS) / 100;
 
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
@@ -226,12 +228,15 @@ contract Strategy is BaseStrategy {
         // If we have enough want to deposit more into the maker vault, we do it
         // Do not skip the rest of the function as it may need to repay or take on more debt
         uint256 wantBalance = balanceOfWant();
+
+        // review I wonder when this would happen
         if (wantBalance > _debtOutstanding) {
             uint256 amountToDeposit = wantBalance.sub(_debtOutstanding);
             _depositToMakerVault(amountToDeposit);
         }
 
         // Nothing to do here if there is no collateral locked in Maker
+        // review would it make sense a case where we have dai but we don't have collat? Donation perhaps.
         if (balanceOfMakerVault() == 0) {
             return;
         }
@@ -323,6 +328,7 @@ contract Strategy is BaseStrategy {
             }
         }
 
+        // review: rename to looseWant to avoid confusion with estimatedTotalAssets()
         uint256 totalAssets = balanceOfWant();
         if (_amountNeeded > totalAssets) {
             _liquidatedAmount = totalAssets;
@@ -378,6 +384,7 @@ contract Strategy is BaseStrategy {
         returns (address[] memory)
     {
         address[] memory protected = new address[](2);
+        // review just hardcode dai. :)
         protected[0] = yVault.token();
         protected[1] = address(yVault);
         return protected;
@@ -407,6 +414,7 @@ contract Strategy is BaseStrategy {
         autoLine.exec(ilk);
     }
 
+    // review perhaps we should move all this maker methods to a separate library.
     function _repayDebt(uint256 currentRatio) internal {
         uint256 currentDebt = balanceOfDebt();
 
@@ -536,6 +544,8 @@ contract Strategy is BaseStrategy {
 
     function _takeYVaultProfit() internal {
         uint256 _debt = balanceOfDebt();
+        // review: we might want to do _valueOfInvestment + balanceOfInvestmentToken()
+        // there might be a donation and we have more dai than expected.
         uint256 _valueInVault = _valueOfInvestment();
         if (_debt >= _valueInVault) {
             return;
@@ -560,6 +570,7 @@ contract Strategy is BaseStrategy {
 
         _checkAllowance(address(gemJoinAdapter), address(want), amount);
 
+        // review: instead of having this logic here, why we don't call _forceMintWithinLimits?
         uint256 price = _getWantTokenPrice();
         uint256 daiToMint =
             amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
@@ -647,6 +658,8 @@ contract Strategy is BaseStrategy {
 
         // Return the worst price available
         minPrice = Math.min(minPrice, chainLinkPrice);
+
+        // review: why the require?
         require(minPrice > 0);
         return minPrice;
     }
@@ -671,11 +684,11 @@ contract Strategy is BaseStrategy {
         // If for some reason we do not have debt (e.g: deposits under dust)
         // make sure the operation does not revert
         if (totalDebt == 0) {
+            // review instead of this hack why don't you return a big number here? type(uint256).max?
             totalDebt = 1;
         }
 
-        uint256 ratio = totalCollateralValue.mul(MAX_BPS).div(totalDebt);
-        return ratio;
+        return totalCollateralValue.mul(MAX_BPS).div(totalDebt);
     }
 
     function _valueOfInvestment() internal view returns (uint256) {

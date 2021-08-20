@@ -16,6 +16,8 @@ def test_revoke_strategy_from_vault(
     vault.revokeStrategy(strategy.address, {"from": gov})
     chain.sleep(1)
     strategy.harvest()
+    assert vault.strategies(strategy).dict()["debtRatio"] == 0
+    assert vault.strategies(strategy).dict()["totalDebt"] == 0
     assert pytest.approx(token.balanceOf(vault.address), rel=RELATIVE_APPROX) == amount
 
 
@@ -32,6 +34,8 @@ def test_revoke_strategy_from_strategy(
     strategy.setEmergencyExit()
     chain.sleep(1)
     strategy.harvest()
+    assert vault.strategies(strategy).dict()["debtRatio"] == 0
+    assert vault.strategies(strategy).dict()["totalDebt"] == 0
     assert pytest.approx(token.balanceOf(vault.address), rel=RELATIVE_APPROX) == amount
 
 
@@ -52,4 +56,5 @@ def test_revoke_with_profit(
     strategy.harvest({"from": gov})
 
     assert vault.strategies(strategy).dict()["totalGain"] > 0
-    assert vault.strategies(strategy).dict()["totalDebt"] <= 1
+    assert vault.strategies(strategy).dict()["debtRatio"] == 0
+    assert vault.strategies(strategy).dict()["totalDebt"] == 0

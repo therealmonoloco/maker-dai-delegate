@@ -68,7 +68,8 @@ contract Strategy is BaseStrategy {
     IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
 
     // DAI token
-    IERC20 internal investmentToken;
+    IERC20 internal constant investmentToken =
+        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     // 100%
     uint256 internal constant MAX_BPS = WAD;
@@ -98,7 +99,6 @@ contract Strategy is BaseStrategy {
     bool public leaveDebtBehind;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        investmentToken = IERC20(yVault.token());
         cdpId = cdpManager.open(ilk, address(this));
         vat = VatLike(cdpManager.vat());
 
@@ -231,11 +231,6 @@ contract Strategy is BaseStrategy {
             _depositToMakerVault(amountToDeposit);
         }
 
-        // Nothing to do here if there is no collateral locked in Maker
-        if (balanceOfMakerVault() == 0) {
-            return;
-        }
-
         // Allow the ratio to move a bit in either direction to avoid cycles
         uint256 currentRatio = getCurrentMakerVaultRatio();
         if (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) {
@@ -323,10 +318,10 @@ contract Strategy is BaseStrategy {
             }
         }
 
-        uint256 totalAssets = balanceOfWant();
-        if (_amountNeeded > totalAssets) {
-            _liquidatedAmount = totalAssets;
-            _loss = _amountNeeded.sub(totalAssets);
+        uint256 looseWant = balanceOfWant();
+        if (_amountNeeded > looseWant) {
+            _liquidatedAmount = looseWant;
+            _loss = _amountNeeded.sub(looseWant);
         } else {
             _liquidatedAmount = _amountNeeded;
         }
@@ -378,7 +373,7 @@ contract Strategy is BaseStrategy {
         returns (address[] memory)
     {
         address[] memory protected = new address[](2);
-        protected[0] = yVault.token();
+        protected[0] = address(investmentToken);
         protected[1] = address(yVault);
         return protected;
     }
@@ -646,9 +641,7 @@ contract Strategy is BaseStrategy {
             uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
 
         // Return the worst price available
-        minPrice = Math.min(minPrice, chainLinkPrice);
-        require(minPrice > 0);
-        return minPrice;
+        return Math.min(minPrice, chainLinkPrice);
     }
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {

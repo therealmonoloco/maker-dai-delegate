@@ -81,7 +81,7 @@ def test_basic_shutdown(
     chain.sleep(1)
     test_strategy.harvest()  ## Remove funds from strategy
 
-    assert vault.strategies(test_strategy)["debtRatio"] == 0
-    assert vault.strategies(test_strategy)["totalDebt"] == 0
+    assert vault.strategies(test_strategy).dict()["debtRatio"] == 0
+    assert vault.strategies(test_strategy).dict()["totalDebt"] == 0
     assert token.balanceOf(test_strategy) == 0
     assert token.balanceOf(vault) >= amount  ## The vault has all funds

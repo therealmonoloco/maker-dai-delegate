@@ -114,7 +114,7 @@ contract Strategy is BaseStrategy {
         leaveDebtBehind = false;
     }
 
-    // ----------------- SETTERS -----------------
+    // ----------------- SETTERS & MIGRATION -----------------
 
     // Target collateralization ratio to maintain within bounds
     function setCollateralizationRatio(uint256 _collateralizationRatio)
@@ -145,6 +145,12 @@ contract Strategy is BaseStrategy {
         leaveDebtBehind = _leaveDebtBehind;
     }
 
+    // Where to route token swaps
+    // Access control is stricter in this method as it will be sent funds
+    function setSwapRouter(ISwap _router) external onlyGovernance {
+        router = _router;
+    }
+
     // Required to move funds to a new cdp and use a different cdpId after migration
     // Should only be called by governance as it will move funds
     function shiftToCdp(uint256 newCdpId) external onlyGovernance {
@@ -152,10 +158,21 @@ contract Strategy is BaseStrategy {
         cdpId = newCdpId;
     }
 
-    // Where to route token swaps
-    // Access control is stricter in this method as it will be sent funds
-    function setSwapRouter(ISwap _router) external onlyGovernance {
-        router = _router;
+    // Move yvDAI funds to a new yVault
+    function migrateToNewDaiYVault(IVault newYVault, uint256 maxLoss)
+        external
+        onlyGovernance
+    {
+        yVault.withdraw(
+            yVault.balanceOf(address(this)),
+            address(this),
+            maxLoss
+        );
+        investmentToken.safeApprove(address(yVault), 0);
+        investmentToken.safeApprove(address(newYVault), type(uint256).max);
+        newYVault.deposit();
+
+        yVault = newYVault;
     }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************

@@ -1,4 +1,4 @@
-from brownie import reverts
+from brownie import chain, reverts
 
 
 def test_set_collateralization_ratio_acl(
@@ -110,3 +110,38 @@ def test_shift_cdp_acl(strategy, gov, strategist, management, guardian, user):
 
     with reverts("!authorized"):
         strategy.shiftToCdp(123, {"from": user})
+
+
+def test_migrate_dai_yvault_acl(
+    strategy,
+    gov,
+    strategist,
+    management,
+    guardian,
+    user,
+    dai,
+    new_dai_yvault,
+    yvault,
+    token,
+    vault,
+    amount,
+):
+    with reverts("!authorized"):
+        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": strategist})
+
+    with reverts("!authorized"):
+        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": management})
+
+    with reverts("!authorized"):
+        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": guardian})
+
+    with reverts("!authorized"):
+        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": user})
+
+    # Need to deposit so there is something in the yVault before migrating
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    chain.sleep(1)
+    strategy.harvest()
+    strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": gov})
+    assert dai.allowance(strategy, new_dai_yvault) == 2 ** 256 - 1

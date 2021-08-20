@@ -141,6 +141,16 @@ def vault(pm, gov, rewards, guardian, management, token):
 
 
 @pytest.fixture
+def new_dai_yvault(pm, gov, rewards, guardian, management, dai):
+    Vault = pm(config["dependencies"][0]).Vault
+    vault = guardian.deploy(Vault)
+    vault.initialize(dai, gov, rewards, "", "", guardian, management)
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setManagement(management, {"from": gov})
+    yield vault
+
+
+@pytest.fixture
 def strategy(strategist, keeper, vault, Strategy, gov):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)

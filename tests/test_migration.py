@@ -40,3 +40,39 @@ def test_migration(
     )
     assert new_strategy.cdpId() == orig_cdp_id
     assert vault.strategies(new_strategy).dict()["totalDebt"] == amount
+
+
+def test_yvault_migration(
+    chain,
+    token,
+    vault,
+    strategy,
+    amount,
+    user,
+    gov,
+    yvault,
+    new_dai_yvault,
+    dai,
+    RELATIVE_APPROX,
+):
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    balanceBefore = yvault.balanceOf(strategy) * yvault.pricePerShare() / 1e18
+
+    strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": gov})
+
+    assert yvault.balanceOf(strategy) == 0
+    assert dai.allowance(strategy, yvault) == 0
+    assert dai.allowance(strategy, new_dai_yvault) == 2 ** 256 - 1
+    assert (
+        pytest.approx(
+            new_dai_yvault.balanceOf(strategy) * new_dai_yvault.pricePerShare() / 1e18,
+            rel=RELATIVE_APPROX,
+        )
+        == balanceBefore
+    )
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount

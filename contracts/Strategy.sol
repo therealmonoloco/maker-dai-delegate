@@ -231,11 +231,6 @@ contract Strategy is BaseStrategy {
             _depositToMakerVault(amountToDeposit);
         }
 
-        // Nothing to do here if there is no collateral locked in Maker
-        if (balanceOfMakerVault() == 0) {
-            return;
-        }
-
         // Allow the ratio to move a bit in either direction to avoid cycles
         uint256 currentRatio = getCurrentMakerVaultRatio();
         if (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) {

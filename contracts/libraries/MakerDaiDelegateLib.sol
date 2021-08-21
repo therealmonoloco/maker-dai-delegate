@@ -18,13 +18,20 @@ library MakerDaiDelegateLib {
     SpotLike internal constant spotter =
         SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
 
+    // Part of the Maker Rates Module in charge of accumulating stability fees
+    JugLike internal constant jug =
+        JugLike(0x19c0976f590D67707E62397C87829d896Dc0f1F1);
+
+    // Debt Ceiling Instant Access Module
+    DssAutoLine internal constant autoLine =
+        DssAutoLine(0xC7Bdd1F2B16447dcf3dE045C4a039A60EC2f0ba3);
+
     // ----------------- PUBLIC FUNCTIONS -----------------
 
     // Deposits collateral (gem) and mints DAI
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
     function lockGemAndDraw(
         ManagerLike manager,
-        JugLike jug,
         GemJoinLike gemJoin,
         DaiJoinLike daiJoin,
         uint256 cdpId,
@@ -47,7 +54,7 @@ library MakerDaiDelegateLib {
         manager.frob(
             cdpId,
             int256(convertTo18(gemJoin, collateralAmount)),
-            _getDrawDart(vat, jug, urn, ilk, daiToMint)
+            _getDrawDart(vat, urn, ilk, daiToMint)
         );
 
         // Moves the DAI amount to the strategy. Need to convert dai from [wad] to [rad]
@@ -172,6 +179,16 @@ library MakerDaiDelegateLib {
             );
     }
 
+    // Make sure we update some key content in Maker contracts
+    // These can be updated by anyone without authenticating
+    function keepBasicMakerHygiene(bytes32 ilk) public {
+        // Update accumulated stability fees
+        jug.drip(ilk);
+
+        // Update the debt ceiling using DSS Auto Line
+        autoLine.exec(ilk);
+    }
+
     // ----------------- INTERNAL FUNCTIONS -----------------
 
     function _forceMintWithinLimits(
@@ -211,7 +228,6 @@ library MakerDaiDelegateLib {
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L161
     function _getDrawDart(
         VatLike vat,
-        JugLike jug,
         address urn,
         bytes32 ilk,
         uint256 wad

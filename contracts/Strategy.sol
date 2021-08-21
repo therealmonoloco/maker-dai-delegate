@@ -31,14 +31,6 @@ contract Strategy is BaseStrategy {
     ManagerLike internal constant cdpManager =
         ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
 
-    // Part of the Maker Rates Module in charge of accumulating stability fees
-    JugLike internal constant jug =
-        JugLike(0x19c0976f590D67707E62397C87829d896Dc0f1F1);
-
-    // Debt Ceiling Instant Access Module
-    DssAutoLine internal constant autoLine =
-        DssAutoLine(0xC7Bdd1F2B16447dcf3dE045C4a039A60EC2f0ba3);
-
     // Token Adapter Module for collateral
     DaiJoinLike internal constant daiJoinAdapter =
         DaiJoinLike(0x9759A6Ac90977b93B58547b4A71c78317f391A28);
@@ -229,7 +221,7 @@ contract Strategy is BaseStrategy {
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
-        _keepBasicMakerHygiene();
+        MakerDaiDelegateLib.keepBasicMakerHygiene(ilk);
 
         // If we have enough want to deposit more into the maker vault, we do it
         // Do not skip the rest of the function as it may need to repay or take on more debt
@@ -399,16 +391,6 @@ contract Strategy is BaseStrategy {
     }
 
     // ----------------- INTERNAL FUNCTIONS SUPPORT -----------------
-
-    // Make sure we update some key content in Maker contracts
-    // These can be updated by anyone without authenticating
-    function _keepBasicMakerHygiene() internal {
-        // Update accumulated stability fees
-        jug.drip(ilk);
-
-        // Update the debt ceiling using DSS Auto Line
-        autoLine.exec(ilk);
-    }
 
     function _repayDebt(uint256 currentRatio) internal {
         uint256 currentDebt = balanceOfDebt();
@@ -672,7 +654,6 @@ contract Strategy is BaseStrategy {
     ) internal {
         MakerDaiDelegateLib.lockGemAndDraw(
             cdpManager,
-            jug,
             gemJoinAdapter,
             daiJoinAdapter,
             cdpId,

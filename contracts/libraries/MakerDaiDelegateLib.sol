@@ -28,6 +28,13 @@ library MakerDaiDelegateLib {
 
     // ----------------- PUBLIC FUNCTIONS -----------------
 
+    function openCdp(ManagerLike manager, bytes32 ilk)
+        public
+        returns (uint256)
+    {
+        return manager.open(ilk, address(this));
+    }
+
     // Deposits collateral (gem) and mints DAI
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
     function lockGemAndDraw(
@@ -102,13 +109,17 @@ library MakerDaiDelegateLib {
         gemJoin.exit(address(this), collateralAmount);
     }
 
-    function debtFloor(VatLike vat, bytes32 ilk) public view returns (uint256) {
+    function debtFloor(ManagerLike manager, bytes32 ilk)
+        public
+        view
+        returns (uint256)
+    {
         // uint256 Art;   // Total Normalised Debt     [wad]
         // uint256 rate;  // Accumulated Rates         [ray]
         // uint256 spot;  // Price with Safety Margin  [ray]
         // uint256 line;  // Debt Ceiling              [rad]
         // uint256 dust;  // Urn Debt Floor            [rad]
-        (, , , , uint256 dust) = vat.ilks(ilk);
+        (, , , , uint256 dust) = VatLike(manager.vat()).ilks(ilk);
         return dust.div(RAY);
     }
 

@@ -86,7 +86,7 @@ contract Strategy is BaseStrategy {
     bool public leaveDebtBehind;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        cdpId = cdpManager.open(ilk, address(this));
+        cdpId = MakerDaiDelegateLib.openCdp(cdpManager, ilk);
 
         // Minimum collaterization ratio on YFI-A is 175%
         // Use 250% as target
@@ -415,8 +415,7 @@ contract Strategy is BaseStrategy {
         // Maker will revert if the outstanding debt is less than a debt floor
         // called 'dust'. If we are there we need to either pay the debt in full
         // or leave at least 'dust' balance (10,000 DAI for YFI-A)
-        uint256 debtFloor =
-            MakerDaiDelegateLib.debtFloor(VatLike(cdpManager.vat()), ilk);
+        uint256 debtFloor = MakerDaiDelegateLib.debtFloor(cdpManager, ilk);
         if (newDebt <= debtFloor) {
             // If we sold want to repay debt we will have DAI readily available in the strategy
             // This means we need to count both yvDAI shares and current DAI balance

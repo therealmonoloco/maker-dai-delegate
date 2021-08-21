@@ -308,14 +308,7 @@ contract Strategy is BaseStrategy {
 
         // Unlock as much collateral as possible while keeping the target ratio
         amountToFree = Math.min(amountToFree, _maxWithdrawal());
-        MakerDaiDelegateLib.wipeAndFreeGem(
-            cdpManager,
-            gemJoinAdapter,
-            daiJoinAdapter,
-            cdpId,
-            amountToFree,
-            0
-        );
+        _freeCollateralAndRepayDai(amountToFree, 0);
 
         // If we are liquidating all positions and were not able to pay the debt in full,
         // we may need to unlock some collateral to sell
@@ -337,14 +330,7 @@ contract Strategy is BaseStrategy {
             if (investmentLeftToAcquireInWant <= balanceOfWant()) {
                 _buyInvestmentTokenWithWant(investmentLeftToAcquire);
                 _repayDebt(0);
-                MakerDaiDelegateLib.wipeAndFreeGem(
-                    cdpManager,
-                    gemJoinAdapter,
-                    daiJoinAdapter,
-                    cdpId,
-                    balanceOfMakerVault(),
-                    0
-                );
+                _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
             }
         }
 
@@ -490,17 +476,7 @@ contract Strategy is BaseStrategy {
         uint256 daiToMint =
             amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
         daiToMint = daiToMint.sub(balanceOfDebt());
-
-        MakerDaiDelegateLib.lockGemAndDraw(
-            cdpManager,
-            jug,
-            gemJoinAdapter,
-            daiJoinAdapter,
-            cdpId,
-            0,
-            daiToMint,
-            balanceOfDebt()
-        );
+        _lockCollateralAndMintDai(0, daiToMint);
     }
 
     function _withdrawFromYVault(uint256 _amountIT) internal returns (uint256) {
@@ -553,14 +529,7 @@ contract Strategy is BaseStrategy {
             }
 
             // Repay debt amount without unlocking collateral
-            MakerDaiDelegateLib.wipeAndFreeGem(
-                cdpManager,
-                gemJoinAdapter,
-                daiJoinAdapter,
-                cdpId,
-                0,
-                amount
-            );
+            _freeCollateralAndRepayDai(0, amount);
         }
     }
 
@@ -605,17 +574,7 @@ contract Strategy is BaseStrategy {
         uint256 daiToMint =
             amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
 
-        // Lock collateral and mint DAI
-        MakerDaiDelegateLib.lockGemAndDraw(
-            cdpManager,
-            jug,
-            gemJoinAdapter,
-            daiJoinAdapter,
-            cdpId,
-            amount,
-            daiToMint,
-            balanceOfDebt()
-        );
+        _lockCollateralAndMintDai(amount, daiToMint);
     }
 
     // Returns maximum collateral to withdraw while maintaining the target collateralization ratio
@@ -739,6 +698,37 @@ contract Strategy is BaseStrategy {
         returns (uint256)
     {
         return amount.mul(10**yVault.decimals()).div(yVault.pricePerShare());
+    }
+
+    // Wrapper around library function to improve readibility
+    function _lockCollateralAndMintDai(
+        uint256 collateralAmount,
+        uint256 daiToMint
+    ) internal {
+        MakerDaiDelegateLib.lockGemAndDraw(
+            cdpManager,
+            jug,
+            gemJoinAdapter,
+            daiJoinAdapter,
+            cdpId,
+            collateralAmount,
+            daiToMint,
+            balanceOfDebt()
+        );
+    }
+
+    function _freeCollateralAndRepayDai(
+        uint256 collateralAmount,
+        uint256 daiToRepay
+    ) internal {
+        MakerDaiDelegateLib.wipeAndFreeGem(
+            cdpManager,
+            gemJoinAdapter,
+            daiJoinAdapter,
+            cdpId,
+            collateralAmount,
+            daiToRepay
+        );
     }
 
     // ----------------- TOKEN CONVERSIONS -----------------

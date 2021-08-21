@@ -101,6 +101,24 @@ library MakerDaiDelegateLib {
         return dust.div(RAY);
     }
 
+    function debtForCdp(
+        ManagerLike manager,
+        uint256 cdpId,
+        bytes32 ilk
+    ) public view returns (uint256) {
+        address urn = manager.urns(cdpId);
+        VatLike vat = VatLike(manager.vat());
+
+        // Normalized outstanding stablecoin debt [wad]
+        (, uint256 art) = vat.urns(ilk, urn);
+
+        // Gets actual rate from the vat [ray]
+        (, uint256 rate, , , ) = vat.ilks(ilk);
+
+        // Return the present value of the debt with accrued fees
+        return art.mul(rate).div(RAY);
+    }
+
     // ----------------- INTERNAL FUNCTIONS -----------------
 
     function _forceMintWithinLimits(

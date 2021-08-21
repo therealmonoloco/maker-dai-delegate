@@ -621,16 +621,7 @@ contract Strategy is BaseStrategy {
     }
 
     function balanceOfDebt() internal view returns (uint256) {
-        address urn = cdpManager.urns(cdpId);
-
-        // Normalized outstanding stablecoin debt [wad]
-        (, uint256 art) = vat.urns(ilk, urn);
-
-        // Gets actual rate from the vat [ray]
-        (, uint256 rate, , , ) = vat.ilks(ilk);
-
-        // Return the present value of the debt with accrued fees
-        return art.mul(rate).div(RAY);
+        return MakerDaiDelegateLib.debtForCdp(cdpManager, cdpId, ilk);
     }
 
     // Returns collateral balance in the vault

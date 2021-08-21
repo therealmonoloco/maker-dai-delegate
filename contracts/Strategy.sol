@@ -700,7 +700,6 @@ contract Strategy is BaseStrategy {
         return amount.mul(10**yVault.decimals()).div(yVault.pricePerShare());
     }
 
-    // Wrapper around library function to improve readibility
     function _lockCollateralAndMintDai(
         uint256 collateralAmount,
         uint256 daiToMint

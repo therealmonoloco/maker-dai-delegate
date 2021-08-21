@@ -7,6 +7,11 @@ def isolation(fn_isolation):
     pass
 
 
+@pytest.fixture(autouse=True)
+def lib(gov, MakerDaiDelegateLib):
+    yield MakerDaiDelegateLib.deploy({"from": gov})
+
+
 @pytest.fixture
 def gov(accounts):
     yield accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True)

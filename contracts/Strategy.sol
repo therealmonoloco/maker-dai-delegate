@@ -11,6 +11,8 @@ import {
     Address
 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
+import "./libraries/MakerDaiDelegateLib.sol";
+
 import "../interfaces/chainlink/AggregatorInterface.sol";
 import "../interfaces/maker/IMaker.sol";
 import "../interfaces/swap/ISwap.sol";
@@ -306,7 +308,14 @@ contract Strategy is BaseStrategy {
 
         // Unlock as much collateral as possible while keeping the target ratio
         amountToFree = Math.min(amountToFree, _maxWithdrawal());
-        _wipeAndFreeGem(amountToFree, 0);
+        MakerDaiDelegateLib.wipeAndFreeGem(
+            cdpManager,
+            gemJoinAdapter,
+            daiJoinAdapter,
+            cdpId,
+            amountToFree,
+            0
+        );
 
         // If we are liquidating all positions and were not able to pay the debt in full,
         // we may need to unlock some collateral to sell
@@ -328,7 +337,14 @@ contract Strategy is BaseStrategy {
             if (investmentLeftToAcquireInWant <= balanceOfWant()) {
                 _buyInvestmentTokenWithWant(investmentLeftToAcquire);
                 _repayDebt(0);
-                _wipeAndFreeGem(balanceOfMakerVault(), 0);
+                MakerDaiDelegateLib.wipeAndFreeGem(
+                    cdpManager,
+                    gemJoinAdapter,
+                    daiJoinAdapter,
+                    cdpId,
+                    balanceOfMakerVault(),
+                    0
+                );
             }
         }
 
@@ -439,7 +455,7 @@ contract Strategy is BaseStrategy {
         // Maker will revert if the outstanding debt is less than a debt floor
         // called 'dust'. If we are there we need to either pay the debt in full
         // or leave at least 'dust' balance (10,000 DAI for YFI-A)
-        uint256 debtFloor = _debtFloor();
+        uint256 debtFloor = MakerDaiDelegateLib.debtFloor(vat, ilk);
         if (newDebt <= debtFloor) {
             // If we sold want to repay debt we will have DAI readily available in the strategy
             // This means we need to count both yvDAI shares and current DAI balance
@@ -475,7 +491,16 @@ contract Strategy is BaseStrategy {
             amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
         daiToMint = daiToMint.sub(balanceOfDebt());
 
-        _lockGemAndDraw(0, daiToMint);
+        MakerDaiDelegateLib.lockGemAndDraw(
+            cdpManager,
+            jug,
+            gemJoinAdapter,
+            daiJoinAdapter,
+            cdpId,
+            0,
+            daiToMint,
+            balanceOfDebt()
+        );
     }
 
     function _withdrawFromYVault(uint256 _amountIT) internal returns (uint256) {
@@ -528,7 +553,14 @@ contract Strategy is BaseStrategy {
             }
 
             // Repay debt amount without unlocking collateral
-            _wipeAndFreeGem(0, amount);
+            MakerDaiDelegateLib.wipeAndFreeGem(
+                cdpManager,
+                gemJoinAdapter,
+                daiJoinAdapter,
+                cdpId,
+                0,
+                amount
+            );
         }
     }
 
@@ -574,7 +606,16 @@ contract Strategy is BaseStrategy {
             amount.mul(price).mul(MAX_BPS).div(collateralizationRatio).div(WAD);
 
         // Lock collateral and mint DAI
-        _lockGemAndDraw(amount, daiToMint);
+        MakerDaiDelegateLib.lockGemAndDraw(
+            cdpManager,
+            jug,
+            gemJoinAdapter,
+            daiJoinAdapter,
+            cdpId,
+            amount,
+            daiToMint,
+            balanceOfDebt()
+        );
     }
 
     // Returns maximum collateral to withdraw while maintaining the target collateralization ratio
@@ -760,142 +801,5 @@ contract Strategy is BaseStrategy {
             address(this),
             now
         );
-    }
-
-    // ----------------- UTILS FROM MAKERDAO DSS-PROXY-ACTIONS -----------------
-
-    // Deposits collateral (gem) and mints DAI
-    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
-    function _lockGemAndDraw(uint256 collateralAmount, uint256 daiToMint)
-        internal
-    {
-        if (daiToMint > 0) {
-            daiToMint = _forceMintWithinLimits(daiToMint);
-        }
-
-        address urn = cdpManager.urns(cdpId);
-
-        // Takes token amount from the strategy and joins into the vat
-        gemJoinAdapter.join(urn, collateralAmount);
-
-        // Locks token amount into the CDP and generates debt
-        cdpManager.frob(
-            cdpId,
-            int256(collateralAmount),
-            _getDrawDart(urn, daiToMint)
-        );
-
-        // Moves the DAI amount to the strategy. Need to convert dai from [wad] to [rad]
-        cdpManager.move(cdpId, address(this), daiToMint.mul(1e27));
-
-        // Allow access to DAI balance in the vat
-        vat.hope(address(daiJoinAdapter));
-
-        // Exits DAI to the user's wallet as a token
-        daiJoinAdapter.exit(address(this), daiToMint);
-    }
-
-    function _forceMintWithinLimits(uint256 desiredAmount)
-        internal
-        returns (uint256)
-    {
-        // uint256 Art;   // Total Normalised Debt     [wad]
-        // uint256 rate;  // Accumulated Rates         [ray]
-        // uint256 spot;  // Price with Safety Margin  [ray]
-        // uint256 line;  // Debt Ceiling              [rad]
-        // uint256 dust;  // Urn Debt Floor            [rad]
-        (uint256 Art, uint256 rate, , uint256 line, uint256 dust) =
-            vat.ilks(ilk);
-
-        // Total debt in [rad] (wad * ray)
-        uint256 vatDebt = Art.mul(rate);
-
-        // Make sure we are not over debt ceiling (line) or under debt floor (dust)
-        if (
-            vatDebt >= line ||
-            (desiredAmount.add(balanceOfDebt()) <= dust.div(RAY))
-        ) {
-            return 0;
-        }
-
-        uint256 maxMintableDAI = line.sub(vatDebt).div(RAY);
-
-        // Prevent rounding errors
-        if (maxMintableDAI > WAD) {
-            maxMintableDAI = maxMintableDAI - 1;
-        }
-
-        return Math.min(maxMintableDAI, desiredAmount);
-    }
-
-    function _debtFloor() internal returns (uint256) {
-        // uint256 Art;   // Total Normalised Debt     [wad]
-        // uint256 rate;  // Accumulated Rates         [ray]
-        // uint256 spot;  // Price with Safety Margin  [ray]
-        // uint256 line;  // Debt Ceiling              [rad]
-        // uint256 dust;  // Urn Debt Floor            [rad]
-        (, , , , uint256 dust) = vat.ilks(ilk);
-        return dust.div(RAY);
-    }
-
-    // Returns DAI to decrease debt and attempts to unlock any amount of collateral
-    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L758
-    function _wipeAndFreeGem(uint256 collateralAmount, uint256 daiToRepay)
-        internal
-    {
-        address urn = cdpManager.urns(cdpId);
-
-        // Joins DAI amount into the vat
-        daiJoinAdapter.join(urn, daiToRepay);
-
-        // Paybacks debt to the CDP and unlocks token amount from it
-        cdpManager.frob(
-            cdpId,
-            -int256(collateralAmount),
-            _getWipeDart(vat.dai(urn), urn)
-        );
-        // Moves the amount from the CDP urn to proxy's address
-        cdpManager.flux(cdpId, address(this), collateralAmount);
-
-        // Exits token amount to the strategy as a token
-        gemJoinAdapter.exit(address(this), collateralAmount);
-    }
-
-    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L161
-    function _getDrawDart(address urn, uint256 wad)
-        internal
-        returns (int256 dart)
-    {
-        // Updates stability fee rate
-        uint256 rate = jug.drip(ilk);
-
-        // Gets DAI balance of the urn in the vat
-        uint256 dai = vat.dai(urn);
-
-        // If there was already enough DAI in the vat balance, just exits it without adding more debt
-        if (dai < wad.mul(RAY)) {
-            // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
-            dart = int256(wad.mul(RAY).sub(dai).div(rate));
-            // This is neeeded due to lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
-            dart = uint256(dart).mul(rate) < wad.mul(RAY) ? dart + 1 : dart;
-        }
-    }
-
-    // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L183
-    function _getWipeDart(uint256 dai, address urn)
-        internal
-        view
-        returns (int256 dart)
-    {
-        // Gets actual rate from the vat
-        (, uint256 rate, , , ) = vat.ilks(ilk);
-        // Gets actual art value of the urn
-        (, uint256 art) = vat.urns(ilk, urn);
-
-        // Uses the whole dai balance in the vat to reduce the debt
-        dart = int256(dai / rate);
-
-        // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
-        dart = uint256(dart) <= art ? -dart : -int256(art);
     }
 }

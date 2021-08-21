@@ -121,27 +121,26 @@ def test_migrate_dai_yvault_acl(
     user,
     dai,
     new_dai_yvault,
-    yvault,
     token,
     vault,
     amount,
 ):
     with reverts("!authorized"):
-        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": strategist})
+        strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": strategist})
 
     with reverts("!authorized"):
-        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": management})
+        strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": management})
 
     with reverts("!authorized"):
-        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": guardian})
+        strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": guardian})
 
     with reverts("!authorized"):
-        strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": user})
+        strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": user})
 
     # Need to deposit so there is something in the yVault before migrating
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
     strategy.harvest()
-    strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": gov})
+    strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": gov})
     assert dai.allowance(strategy, new_dai_yvault) == 2 ** 256 - 1

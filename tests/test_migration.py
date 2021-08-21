@@ -63,7 +63,7 @@ def test_yvault_migration(
 
     balanceBefore = yvault.balanceOf(strategy) * yvault.pricePerShare() / 1e18
 
-    strategy.migrateToNewDaiYVault(new_dai_yvault, 1, {"from": gov})
+    strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": gov})
 
     assert yvault.balanceOf(strategy) == 0
     assert dai.allowance(strategy, yvault) == 0

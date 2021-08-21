@@ -159,10 +159,7 @@ contract Strategy is BaseStrategy {
     }
 
     // Move yvDAI funds to a new yVault
-    function migrateToNewDaiYVault(IVault newYVault, uint256 maxLoss)
-        external
-        onlyGovernance
-    {
+    function migrateToNewDaiYVault(IVault newYVault) external onlyGovernance {
         yVault.withdraw(
             yVault.balanceOf(address(this)),
             address(this),

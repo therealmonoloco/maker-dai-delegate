@@ -1,6 +1,6 @@
 import pytest
 
-from brownie import Contract
+from brownie import Contract, reverts
 
 
 def test_migration(
@@ -40,6 +40,10 @@ def test_migration(
     )
     assert new_strategy.cdpId() == orig_cdp_id
     assert vault.strategies(new_strategy).dict()["totalDebt"] == amount
+
+    # Old strategy should have relinquished ownership of the CDP
+    with reverts("cdp-not-allowed"):
+        strategy.shiftToCdp(orig_cdp_id, {"from": gov})
 
 
 def test_yvault_migration(

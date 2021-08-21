@@ -47,13 +47,6 @@ contract Strategy is BaseStrategy {
     GemJoinLike internal constant gemJoinAdapter =
         GemJoinLike(0x3ff33d9162aD47660083D7DC4bC02Fb231c81677);
 
-    // Liaison between oracles and core Maker contracts
-    SpotLike internal constant spotter =
-        SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
-
-    // Maker Accounting System
-    VatLike internal vat;
-
     // Maker Oracle Security Module
     OracleSecurityModule public constant YFItoUSDOSMProxy =
         OracleSecurityModule(0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f);
@@ -102,7 +95,6 @@ contract Strategy is BaseStrategy {
 
     constructor(address _vault) public BaseStrategy(_vault) {
         cdpId = cdpManager.open(ilk, address(this));
-        vat = VatLike(cdpManager.vat());
 
         // Minimum collaterization ratio on YFI-A is 175%
         // Use 250% as target
@@ -441,7 +433,8 @@ contract Strategy is BaseStrategy {
         // Maker will revert if the outstanding debt is less than a debt floor
         // called 'dust'. If we are there we need to either pay the debt in full
         // or leave at least 'dust' balance (10,000 DAI for YFI-A)
-        uint256 debtFloor = MakerDaiDelegateLib.debtFloor(vat, ilk);
+        uint256 debtFloor =
+            MakerDaiDelegateLib.debtFloor(VatLike(cdpManager.vat()), ilk);
         if (newDebt <= debtFloor) {
             // If we sold want to repay debt we will have DAI readily available in the strategy
             // This means we need to count both yvDAI shares and current DAI balance
@@ -626,9 +619,7 @@ contract Strategy is BaseStrategy {
 
     // Returns collateral balance in the vault
     function balanceOfMakerVault() internal view returns (uint256) {
-        address urn = cdpManager.urns(cdpId);
-        (uint256 ink, ) = vat.urns(ilk, urn);
-        return ink;
+        return MakerDaiDelegateLib.balanceOfCdp(cdpManager, cdpId, ilk);
     }
 
     function _getWantTokenPrice() internal view returns (uint256) {
@@ -650,30 +641,14 @@ contract Strategy is BaseStrategy {
     }
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {
-        // spot: collateral price with safety margin returned in [ray]
-        (, , uint256 spot, , ) = vat.ilks(ilk);
-
-        // Liquidation ratio for the given ilk returned in [ray]
-        // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
-        (, uint256 liquidationRatio) = spotter.ilks(ilk);
-
-        // Use pessimistic price to determine the worst ratio possible
-        uint256 price = spot.mul(liquidationRatio).div(RAY * 1e9); // convert ray*ray --> wad
-
-        price = Math.min(price, _getWantTokenPrice());
-
-        uint256 totalCollateralValue =
-            balanceOfMakerVault().mul(price).div(WAD);
-        uint256 totalDebt = balanceOfDebt();
-
-        // If for some reason we do not have debt (e.g: deposits under dust)
-        // make sure the operation does not revert
-        if (totalDebt == 0) {
-            totalDebt = 1;
-        }
-
-        uint256 ratio = totalCollateralValue.mul(MAX_BPS).div(totalDebt);
-        return ratio;
+        return
+            MakerDaiDelegateLib.getPessimisticRatioOfCdpWithExternalPrice(
+                cdpManager,
+                cdpId,
+                ilk,
+                _getWantTokenPrice(),
+                MAX_BPS
+            );
     }
 
     function _valueOfInvestment() internal view returns (uint256) {

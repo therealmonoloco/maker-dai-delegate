@@ -14,6 +14,10 @@ library MakerDaiDelegateLib {
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
 
+    // Liaison between oracles and core Maker contracts
+    SpotLike internal constant spotter =
+        SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
+
     // ----------------- PUBLIC FUNCTIONS -----------------
 
     // Deposits collateral (gem) and mints DAI
@@ -117,6 +121,55 @@ library MakerDaiDelegateLib {
 
         // Return the present value of the debt with accrued fees
         return art.mul(rate).div(RAY);
+    }
+
+    function balanceOfCdp(
+        ManagerLike manager,
+        uint256 cdpId,
+        bytes32 ilk
+    ) public view returns (uint256) {
+        address urn = manager.urns(cdpId);
+        VatLike vat = VatLike(manager.vat());
+
+        (uint256 ink, ) = vat.urns(ilk, urn);
+        return ink;
+    }
+
+    function getPessimisticRatioOfCdpWithExternalPrice(
+        ManagerLike manager,
+        uint256 cdpId,
+        bytes32 ilk,
+        uint256 externalPrice,
+        uint256 collateralizationRatioPrecision
+    ) public view returns (uint256) {
+        VatLike vat = VatLike(manager.vat());
+
+        // spot: collateral price with safety margin returned in [ray]
+        (, , uint256 spot, , ) = vat.ilks(ilk);
+
+        // Liquidation ratio for the given ilk returned in [ray]
+        // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
+        (, uint256 liquidationRatio) = spotter.ilks(ilk);
+
+        // Use pessimistic price to determine the worst ratio possible
+        uint256 price = spot.mul(liquidationRatio).div(RAY * 1e9); // convert ray*ray --> wad
+
+        price = Math.min(price, externalPrice);
+
+        uint256 totalCollateralValue =
+            balanceOfCdp(manager, cdpId, ilk).mul(price).div(WAD);
+        uint256 totalDebt = debtForCdp(manager, cdpId, ilk);
+
+        // If for some reason we do not have debt (e.g: deposits under dust)
+        // make sure the operation does not revert
+        if (totalDebt == 0) {
+            totalDebt = 1;
+        }
+
+        return
+            totalCollateralValue.mul(collateralizationRatioPrecision).div(
+                totalDebt
+            );
     }
 
     // ----------------- INTERNAL FUNCTIONS -----------------

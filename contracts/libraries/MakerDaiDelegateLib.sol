@@ -14,6 +14,10 @@ library MakerDaiDelegateLib {
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
 
+    // Maker vaults manager
+    ManagerLike internal constant manager =
+        ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
+
     // Liaison between oracles and core Maker contracts
     SpotLike internal constant spotter =
         SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
@@ -28,17 +32,21 @@ library MakerDaiDelegateLib {
 
     // ----------------- PUBLIC FUNCTIONS -----------------
 
-    function openCdp(ManagerLike manager, bytes32 ilk)
-        public
-        returns (uint256)
-    {
+    function openCdp(bytes32 ilk) public returns (uint256) {
         return manager.open(ilk, address(this));
+    }
+
+    function shiftCdp(uint256 cdpId, uint256 newCdpId) public {
+        manager.shift(cdpId, newCdpId);
+    }
+
+    function transferCdp(uint256 cdpId, address recipient) public {
+        manager.give(cdpId, recipient);
     }
 
     // Deposits collateral (gem) and mints DAI
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
     function lockGemAndDraw(
-        ManagerLike manager,
         GemJoinLike gemJoin,
         DaiJoinLike daiJoin,
         uint256 cdpId,
@@ -77,7 +85,6 @@ library MakerDaiDelegateLib {
     // Returns DAI to decrease debt and attempts to unlock any amount of collateral
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L758
     function wipeAndFreeGem(
-        ManagerLike manager,
         GemJoinLike gemJoin,
         DaiJoinLike daiJoin,
         uint256 cdpId,
@@ -109,11 +116,7 @@ library MakerDaiDelegateLib {
         gemJoin.exit(address(this), collateralAmount);
     }
 
-    function debtFloor(ManagerLike manager, bytes32 ilk)
-        public
-        view
-        returns (uint256)
-    {
+    function debtFloor(bytes32 ilk) public view returns (uint256) {
         // uint256 Art;   // Total Normalised Debt     [wad]
         // uint256 rate;  // Accumulated Rates         [ray]
         // uint256 spot;  // Price with Safety Margin  [ray]
@@ -123,11 +126,11 @@ library MakerDaiDelegateLib {
         return dust.div(RAY);
     }
 
-    function debtForCdp(
-        ManagerLike manager,
-        uint256 cdpId,
-        bytes32 ilk
-    ) public view returns (uint256) {
+    function debtForCdp(uint256 cdpId, bytes32 ilk)
+        public
+        view
+        returns (uint256)
+    {
         address urn = manager.urns(cdpId);
         VatLike vat = VatLike(manager.vat());
 
@@ -141,11 +144,11 @@ library MakerDaiDelegateLib {
         return art.mul(rate).div(RAY);
     }
 
-    function balanceOfCdp(
-        ManagerLike manager,
-        uint256 cdpId,
-        bytes32 ilk
-    ) public view returns (uint256) {
+    function balanceOfCdp(uint256 cdpId, bytes32 ilk)
+        public
+        view
+        returns (uint256)
+    {
         address urn = manager.urns(cdpId);
         VatLike vat = VatLike(manager.vat());
 
@@ -159,11 +162,7 @@ library MakerDaiDelegateLib {
         return spotter.par();
     }
 
-    function getSpotPrice(ManagerLike manager, bytes32 ilk)
-        public
-        view
-        returns (uint256)
-    {
+    function getSpotPrice(bytes32 ilk) public view returns (uint256) {
         VatLike vat = VatLike(manager.vat());
 
         // spot: collateral price with safety margin returned in [ray]
@@ -178,18 +177,17 @@ library MakerDaiDelegateLib {
     }
 
     function getPessimisticRatioOfCdpWithExternalPrice(
-        ManagerLike manager,
         uint256 cdpId,
         bytes32 ilk,
         uint256 externalPrice,
         uint256 collateralizationRatioPrecision
     ) public view returns (uint256) {
         // Use pessimistic price to determine the worst ratio possible
-        uint256 price = Math.min(getSpotPrice(manager, ilk), externalPrice);
+        uint256 price = Math.min(getSpotPrice(ilk), externalPrice);
 
         uint256 totalCollateralValue =
-            balanceOfCdp(manager, cdpId, ilk).mul(price).div(WAD);
-        uint256 totalDebt = debtForCdp(manager, cdpId, ilk);
+            balanceOfCdp(cdpId, ilk).mul(price).div(WAD);
+        uint256 totalDebt = debtForCdp(cdpId, ilk);
 
         // If for some reason we do not have debt (e.g: deposits under dust)
         // make sure the operation does not revert

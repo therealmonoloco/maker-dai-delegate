@@ -27,10 +27,6 @@ contract Strategy is BaseStrategy {
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
 
-    // Maker vaults manager
-    ManagerLike internal constant cdpManager =
-        ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
-
     // Token Adapter Module for collateral
     DaiJoinLike internal constant daiJoinAdapter =
         DaiJoinLike(0x9759A6Ac90977b93B58547b4A71c78317f391A28);
@@ -86,7 +82,8 @@ contract Strategy is BaseStrategy {
     bool public leaveDebtBehind;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        cdpId = MakerDaiDelegateLib.openCdp(cdpManager, ilk);
+        cdpId = MakerDaiDelegateLib.openCdp(ilk);
+        require(cdpId > 0);
 
         // Minimum collaterization ratio on YFI-A is 175%
         // Use 250% as target
@@ -140,7 +137,7 @@ contract Strategy is BaseStrategy {
     // Required to move funds to a new cdp and use a different cdpId after migration
     // Should only be called by governance as it will move funds
     function shiftToCdp(uint256 newCdpId) external onlyGovernance {
-        cdpManager.shift(cdpId, newCdpId);
+        MakerDaiDelegateLib.shiftCdp(cdpId, newCdpId);
         cdpId = newCdpId;
     }
 
@@ -357,7 +354,7 @@ contract Strategy is BaseStrategy {
 
     function prepareMigration(address _newStrategy) internal override {
         // Transfer Maker Vault ownership to the new startegy
-        cdpManager.give(cdpId, _newStrategy);
+        MakerDaiDelegateLib.transferCdp(cdpId, _newStrategy);
 
         // Move yvDAI balance to the new strategy
         IERC20(yVault).safeTransfer(
@@ -415,7 +412,7 @@ contract Strategy is BaseStrategy {
         // Maker will revert if the outstanding debt is less than a debt floor
         // called 'dust'. If we are there we need to either pay the debt in full
         // or leave at least 'dust' balance (10,000 DAI for YFI-A)
-        uint256 debtFloor = MakerDaiDelegateLib.debtFloor(cdpManager, ilk);
+        uint256 debtFloor = MakerDaiDelegateLib.debtFloor(ilk);
         if (newDebt <= debtFloor) {
             // If we sold want to repay debt we will have DAI readily available in the strategy
             // This means we need to count both yvDAI shares and current DAI balance
@@ -595,12 +592,12 @@ contract Strategy is BaseStrategy {
     }
 
     function balanceOfDebt() internal view returns (uint256) {
-        return MakerDaiDelegateLib.debtForCdp(cdpManager, cdpId, ilk);
+        return MakerDaiDelegateLib.debtForCdp(cdpId, ilk);
     }
 
     // Returns collateral balance in the vault
     function balanceOfMakerVault() internal view returns (uint256) {
-        return MakerDaiDelegateLib.balanceOfCdp(cdpManager, cdpId, ilk);
+        return MakerDaiDelegateLib.balanceOfCdp(cdpId, ilk);
     }
 
     function _getWantTokenPrice() internal view returns (uint256) {
@@ -630,7 +627,6 @@ contract Strategy is BaseStrategy {
     function getCurrentMakerVaultRatio() internal view returns (uint256) {
         return
             MakerDaiDelegateLib.getPessimisticRatioOfCdpWithExternalPrice(
-                cdpManager,
                 cdpId,
                 ilk,
                 _getWantTokenPrice(),
@@ -658,7 +654,6 @@ contract Strategy is BaseStrategy {
         uint256 daiToMint
     ) internal {
         MakerDaiDelegateLib.lockGemAndDraw(
-            cdpManager,
             gemJoinAdapter,
             daiJoinAdapter,
             cdpId,
@@ -673,7 +668,6 @@ contract Strategy is BaseStrategy {
         uint256 daiToRepay
     ) internal {
         MakerDaiDelegateLib.wipeAndFreeGem(
-            cdpManager,
             gemJoinAdapter,
             daiJoinAdapter,
             cdpId,

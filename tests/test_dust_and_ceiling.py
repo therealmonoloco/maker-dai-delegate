@@ -4,7 +4,7 @@ from brownie import chain, reverts, Wei
 
 
 def test_small_deposit_does_not_generate_debt_under_floor(
-    vault, test_strategy, token, token_whale, yvault, borrow_token
+    vault, test_strategy, token, token_whale, yvault, borrow_token, gov
 ):
     price = test_strategy._getPrice()
     floor = Wei("9_990 ether")  # assume a price floor of 10k as in YFI-A
@@ -18,7 +18,7 @@ def test_small_deposit_does_not_generate_debt_under_floor(
     token.approve(vault.address, token_floor, {"from": token_whale})
     vault.deposit(token_floor, {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Debt floor is 10k for YFI-A, so the strategy should not take any debt
     # with a lower deposit amount
@@ -37,7 +37,7 @@ def test_small_deposit_does_not_generate_debt_under_floor(
 
 
 def test_deposit_after_passing_debt_floor_generates_debt(
-    vault, test_strategy, token, token_whale, yvault, borrow_token, RELATIVE_APPROX
+    vault, test_strategy, token, token_whale, yvault, borrow_token, gov, RELATIVE_APPROX
 ):
     price = test_strategy._getPrice()
     floor = Wei("9_990 ether")  # assume a price floor of 10k as in YFI-A
@@ -51,7 +51,7 @@ def test_deposit_after_passing_debt_floor_generates_debt(
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(token_floor, {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Debt floor is 10k for YFI-A, so the strategy should not take any debt
     # with a lower deposit amount
@@ -61,7 +61,7 @@ def test_deposit_after_passing_debt_floor_generates_debt(
     # Deposit enough want token to go over the dust
     vault.deposit(Wei("0.5 ether"), {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Ensure that we have now taken on debt and deposited into yVault
     assert yvault.balanceOf(test_strategy) > 0
@@ -74,13 +74,13 @@ def test_deposit_after_passing_debt_floor_generates_debt(
 
 
 def test_withdraw_does_not_leave_debt_under_floor(
-    vault, test_strategy, token, token_whale, yvault, dai, dai_whale, RELATIVE_APPROX
+    vault, test_strategy, token, token_whale, yvault, dai, dai_whale, gov
 ):
     # Deposit to the vault and send funds through the strategy
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(Wei("10 ether"), {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # We took some debt and deposited into yvDAI
     assert yvault.balanceOf(test_strategy) > 0
@@ -106,13 +106,13 @@ def test_withdraw_does_not_leave_debt_under_floor(
 
 
 def test_large_deposit_does_not_generate_debt_over_ceiling(
-    vault, test_strategy, token, token_whale, yvault, borrow_token
+    vault, test_strategy, token, token_whale, yvault, borrow_token, gov
 ):
     # Deposit to the vault and send funds through the strategy
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(token.balanceOf(token_whale), {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Debt ceiling is ~7 million in YFI-A at this time
     # The whale should deposit >2x that to hit the ceiling
@@ -131,7 +131,7 @@ def test_large_deposit_does_not_generate_debt_over_ceiling(
 
 
 def test_withdraw_everything_with_vault_in_debt_ceiling(
-    vault, test_strategy, token, token_whale, yvault, RELATIVE_APPROX
+    vault, test_strategy, token, token_whale, yvault, gov, RELATIVE_APPROX
 ):
     amount = token.balanceOf(token_whale)
 
@@ -139,7 +139,7 @@ def test_withdraw_everything_with_vault_in_debt_ceiling(
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(amount, {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     vault.withdraw({"from": token_whale})
 
@@ -150,17 +150,17 @@ def test_withdraw_everything_with_vault_in_debt_ceiling(
 
 
 def test_large_want_balance_does_not_generate_debt_over_ceiling(
-    vault, test_strategy, token, token_whale, yvault, borrow_token
+    vault, test_strategy, token, token_whale, yvault, borrow_token, gov
 ):
     token.transfer(test_strategy, Wei("500 ether"), {"from": token_whale})
 
     # First harvest will move profits to the vault
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Second harvest will send the funds through the strategy to invest
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Debt ceiling is ~7 million in YFI-A at this time
     # The whale should deposit >2x that to hit the ceiling
@@ -179,17 +179,17 @@ def test_large_want_balance_does_not_generate_debt_over_ceiling(
 
 
 def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
-    vault, test_strategy, token, token_whale, yvault
+    vault, test_strategy, token, token_whale, yvault, gov
 ):
     token.transfer(test_strategy, Wei("500 ether"), {"from": token_whale})
 
     # First harvest will move profits to the vault
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Second harvest will send the funds through the strategy to invest
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     investment_before = yvault.balanceOf(test_strategy)
     ratio_before = test_strategy._getCurrentMakerVaultRatio()
@@ -198,7 +198,7 @@ def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(token.balanceOf(token_whale), {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     assert investment_before >= yvault.balanceOf(test_strategy)
     assert ratio_before < test_strategy._getCurrentMakerVaultRatio()
@@ -206,16 +206,7 @@ def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
 
 # Fixture 'amount' is included so user has some balance
 def test_withdraw_everything_cancels_entire_debt(
-    vault,
-    test_strategy,
-    token,
-    token_whale,
-    user,
-    amount,
-    yvault,
-    dai,
-    dai_whale,
-    RELATIVE_APPROX,
+    vault, test_strategy, token, token_whale, user, amount, yvault, dai, dai_whale, gov,
 ):
     amount_user = Wei("0.25 ether")
     amount_whale = Wei("10 ether")
@@ -228,7 +219,7 @@ def test_withdraw_everything_cancels_entire_debt(
     vault.deposit(amount_user, {"from": user})
 
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Send profits to yVault
     dai.transfer(yvault, yvault.totalAssets() * 0.00001, {"from": dai_whale})
@@ -263,7 +254,7 @@ def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(token_floor, {"from": token_whale})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     max_withdrawal = token_floor - min_floor_in_band - Wei("0.0001 ether")
 
@@ -284,7 +275,7 @@ def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
 
 
 def test_small_withdraw_cancels_corresponding_debt(
-    vault, strategy, token, token_whale, yvault, RELATIVE_APPROX
+    vault, strategy, token, token_whale, yvault, gov, RELATIVE_APPROX
 ):
     amount = Wei("10 ether")
     to_withdraw_pct = 0.2
@@ -293,7 +284,7 @@ def test_small_withdraw_cancels_corresponding_debt(
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(amount, {"from": token_whale})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
 
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(strategy)

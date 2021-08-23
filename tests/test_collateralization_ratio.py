@@ -3,7 +3,7 @@ from brownie import chain
 
 
 def test_lower_target_ratio_should_take_more_debt(
-    vault, strategy, token, yvault, amount, user, RELATIVE_APPROX
+    vault, strategy, token, yvault, amount, user, gov, RELATIVE_APPROX
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -11,7 +11,7 @@ def test_lower_target_ratio_should_take_more_debt(
 
     # Harvest 1: Send funds through the strategy
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
 
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(strategy)
@@ -20,11 +20,11 @@ def test_lower_target_ratio_should_take_more_debt(
 
     # In default settings this will be 250 * 0.8 = 200
     strategy.setCollateralizationRatio(
-        strategy.collateralizationRatio() * new_ratio_relative
+        strategy.collateralizationRatio() * new_ratio_relative, {"from": gov}
     )
 
     # Adjust the position
-    strategy.tend()
+    strategy.tend({"from": gov})
 
     # Because the target collateralization ratio is lower, more DAI will be minted
     # and deposited into the yvDAI vault
@@ -34,7 +34,7 @@ def test_lower_target_ratio_should_take_more_debt(
 
 
 def test_lower_ratio_inside_rebalancing_band_should_not_take_more_debt(
-    vault, strategy, token, yvault, amount, user
+    vault, strategy, token, yvault, amount, user, gov
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -42,16 +42,16 @@ def test_lower_ratio_inside_rebalancing_band_should_not_take_more_debt(
 
     # Harvest 1: Send funds through the strategy
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
 
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(strategy)
 
     new_ratio = strategy.collateralizationRatio() - strategy.rebalanceTolerance() * 0.99
-    strategy.setCollateralizationRatio(new_ratio)
+    strategy.setCollateralizationRatio(new_ratio, {"from": gov})
 
     # Adjust the position
-    strategy.tend()
+    strategy.tend({"from": gov})
 
     # Because the current ratio is inside the rebalancing band
     # no more DAI will be minted and deposited into the yvDAI vault
@@ -59,7 +59,7 @@ def test_lower_ratio_inside_rebalancing_band_should_not_take_more_debt(
 
 
 def test_higher_target_ratio_should_repay_debt(
-    vault, strategy, token, yvault, amount, user, RELATIVE_APPROX
+    vault, strategy, token, yvault, amount, user, gov, RELATIVE_APPROX
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -67,7 +67,7 @@ def test_higher_target_ratio_should_repay_debt(
 
     # Harvest 1: Send funds through the strategy
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
 
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(strategy)
@@ -76,11 +76,11 @@ def test_higher_target_ratio_should_repay_debt(
 
     # In default settings this will be 250 * 1.2 = 300
     strategy.setCollateralizationRatio(
-        strategy.collateralizationRatio() * new_ratio_relative
+        strategy.collateralizationRatio() * new_ratio_relative, {"from": gov}
     )
 
     # Adjust the position
-    strategy.tend()
+    strategy.tend({"from": gov})
 
     # Because the target collateralization ratio is higher, a part of the debt
     # will be repaid to maintain a healthy ratio
@@ -90,7 +90,7 @@ def test_higher_target_ratio_should_repay_debt(
 
 
 def test_higher_ratio_inside_rebalancing_band_should_not_repay_debt(
-    vault, test_strategy, token, yvault, amount, user
+    vault, test_strategy, token, yvault, amount, user, gov
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -98,7 +98,7 @@ def test_higher_ratio_inside_rebalancing_band_should_not_repay_debt(
 
     # Harvest 1: Send funds through the strategy
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(test_strategy)
@@ -107,19 +107,19 @@ def test_higher_ratio_inside_rebalancing_band_should_not_repay_debt(
         test_strategy.collateralizationRatio()
         + test_strategy.rebalanceTolerance() * 0.99
     )
-    test_strategy.setCollateralizationRatio(new_ratio)
+    test_strategy.setCollateralizationRatio(new_ratio, {"from": gov})
 
     assert test_strategy.tendTrigger(1) == False
 
     # Adjust the position
-    test_strategy.tend()
+    test_strategy.tend({"from": gov})
 
     # Because the current ratio is inside the rebalancing band no debt will be repaid
     assert shares_before == yvault.balanceOf(test_strategy)
 
 
 def test_vault_ratio_calculation_on_withdraw(
-    vault, test_strategy, token, yvault, amount, user, RELATIVE_APPROX
+    vault, test_strategy, token, yvault, amount, user, gov, RELATIVE_APPROX
 ):
     # Initial ratio is 0 because there is no collateral locked
     assert test_strategy._getCurrentMakerVaultRatio() == 0
@@ -128,7 +128,7 @@ def test_vault_ratio_calculation_on_withdraw(
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # Collateral ratio should be the target ratio set
     assert (
@@ -153,7 +153,7 @@ def test_vault_ratio_calculation_on_withdraw(
     )
 
 
-def test_tend_trigger_conditions(vault, strategy, token, amount, user):
+def test_tend_trigger_conditions(vault, strategy, token, amount, user, gov):
     # Initial ratio is 0 because there is no collateral locked
     assert strategy.tendTrigger(1) == False
 
@@ -161,7 +161,7 @@ def test_tend_trigger_conditions(vault, strategy, token, amount, user):
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
 
     orig_target = strategy.collateralizationRatio()
     rebalance_tolerance = strategy.rebalanceTolerance()
@@ -170,17 +170,25 @@ def test_tend_trigger_conditions(vault, strategy, token, amount, user):
     assert strategy.tendTrigger(1) == False
 
     # Going over the rebalancing band should need to adjust position
-    strategy.setCollateralizationRatio(orig_target + rebalance_tolerance * 1.001)
+    strategy.setCollateralizationRatio(
+        orig_target + rebalance_tolerance * 1.001, {"from": gov}
+    )
     assert strategy.tendTrigger(1) == True
 
     # Going over the target ratio but inside rebalancing band should not adjust position
-    strategy.setCollateralizationRatio(orig_target + rebalance_tolerance * 0.999)
+    strategy.setCollateralizationRatio(
+        orig_target + rebalance_tolerance * 0.999, {"from": gov}
+    )
     assert strategy.tendTrigger(1) == False
 
     # Going under the rebalancing band should need to adjust position
-    strategy.setCollateralizationRatio(orig_target - rebalance_tolerance * 1.001)
+    strategy.setCollateralizationRatio(
+        orig_target - rebalance_tolerance * 1.001, {"from": gov}
+    )
     assert strategy.tendTrigger(1) == True
 
     # Going under the target ratio but inside rebalancing band should not adjust position
-    strategy.setCollateralizationRatio(orig_target - rebalance_tolerance * 0.999)
+    strategy.setCollateralizationRatio(
+        orig_target - rebalance_tolerance * 0.999, {"from": gov}
+    )
     assert strategy.tendTrigger(1) == False

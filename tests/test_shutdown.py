@@ -7,7 +7,7 @@ from brownie import Wei
 
 
 def test_vault_shutdown_can_withdraw(
-    chain, token, vault, test_strategy, user, amount, RELATIVE_APPROX
+    chain, token, vault, test_strategy, user, amount, gov, RELATIVE_APPROX
 ):
     ## Deposit in Vault
     token.approve(vault.address, amount, {"from": user})
@@ -23,7 +23,7 @@ def test_vault_shutdown_can_withdraw(
 
     # Harvest 1: Send funds through the strategy
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
     chain.sleep(3600 * 7)
     chain.mine(1)
 
@@ -47,6 +47,7 @@ def test_basic_shutdown(
     yvDAI,
     dai,
     dai_whale,
+    gov,
     RELATIVE_APPROX,
 ):
     # Deposit to the vault
@@ -56,7 +57,7 @@ def test_basic_shutdown(
 
     # Harvest 1: Send funds through the strategy
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
     chain.mine(100)
     assert (
         pytest.approx(test_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
@@ -71,7 +72,7 @@ def test_basic_shutdown(
     dai.transfer(yvDAI, yvDAI.totalAssets() * 0.03, {"from": dai_whale})
 
     # Harvest 2: Realize profit
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
     chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
     chain.mine(1)
 
@@ -79,7 +80,7 @@ def test_basic_shutdown(
     test_strategy.setEmergencyExit({"from": strategist})
 
     chain.sleep(1)
-    test_strategy.harvest()  ## Remove funds from strategy
+    test_strategy.harvest({"from": gov})  ## Remove funds from strategy
 
     assert vault.strategies(test_strategy).dict()["debtRatio"] == 0
     assert vault.strategies(test_strategy).dict()["totalDebt"] == 0

@@ -40,7 +40,7 @@ contract MakerDaiDelegateCloner {
         Strategy(_original).setStrategist(msg.sender);
     }
 
-    function cloneAaveLenderBorrower(
+    function cloneMakerDaiDelegate(
         address _vault,
         address _strategist,
         address _rewards,

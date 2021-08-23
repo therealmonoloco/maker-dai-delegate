@@ -141,6 +141,6 @@ def test_migrate_dai_yvault_acl(
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": gov})
     assert dai.allowance(strategy, new_dai_yvault) == 2 ** 256 - 1

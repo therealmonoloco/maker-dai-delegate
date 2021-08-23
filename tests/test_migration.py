@@ -7,23 +7,40 @@ def test_migration(
     chain,
     token,
     vault,
+    yvault,
     strategy,
+    strategist,
     amount,
     Strategy,
-    strategist,
     gov,
     user,
+    cloner,
     RELATIVE_APPROX,
 ):
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     # migrate to a new strategy
-    new_strategy = strategist.deploy(Strategy, vault)
+    new_strategy = Strategy.at(
+        cloner.cloneMakerDaiDelegate(
+            vault,
+            strategist,
+            strategist,
+            strategist,
+            yvault,
+            "name",
+            strategy.ilk(),
+            strategy.gemJoinAdapter(),
+            strategy.wantToUSDOSMProxy(),
+            strategy.chainlinkWantToUSDPriceFeed(),
+            strategy.chainlinkWantToETHPriceFeed(),
+        ).return_value
+    )
+
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
 
     # Allow the new strategy to query the OSM proxy
@@ -62,7 +79,7 @@ def test_yvault_migration(
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     balanceBefore = yvault.balanceOf(strategy) * yvault.pricePerShare() / 1e18

@@ -49,7 +49,7 @@ def test_liquidate_more_than_we_have_should_report_loss(
 # We expect the recovered collateral to be a bit less than the deposited amount
 # due to Maker Stability Fees.
 def test_liquidate_position_without_enough_profit_by_selling_want(
-    chain, token, vault, test_strategy, user, amount, yvault, token_whale
+    chain, token, vault, test_strategy, user, amount, yvault, token_whale, gov
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -65,7 +65,7 @@ def test_liquidate_position_without_enough_profit_by_selling_want(
     )
 
     # Harvest so all the collateral is locked in the CDP
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     (_liquidatedAmount, _loss) = test_strategy._liquidatePosition(amount).return_value
     assert _liquidatedAmount + _loss == amount
@@ -101,7 +101,7 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
     chain.mine(1)
 
     # Harvest so all the collateral is locked in the CDP
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     token_price = test_strategy._getPrice()
 
@@ -142,7 +142,7 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
 
 # In this test the strategy has enough profit to close the whole position
 def test_happy_liquidation(
-    chain, token, vault, test_strategy, yvDAI, dai, dai_whale, user, amount
+    chain, token, vault, test_strategy, yvDAI, dai, dai_whale, user, amount, gov
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -150,7 +150,7 @@ def test_happy_liquidation(
 
     # Harvest so all the collateral is locked in the CDP
     chain.sleep(1)
-    test_strategy.harvest()
+    test_strategy.harvest({"from": gov})
 
     # sleep 7 days
     chain.sleep(24 * 60 * 60 * 7)

@@ -7,7 +7,28 @@ import "./Strategy.sol";
 // The purpose of this wrapper contract is to expose internal functions
 // that may contain application logic and therefore need to be unit tested.
 contract TestStrategy is Strategy {
-    constructor(address _vault) public Strategy(_vault) {}
+    constructor(
+        address _vault,
+        address _yVault,
+        string memory _strategyName,
+        bytes32 _ilk,
+        address _gemJoin,
+        address _wantToUSDOSMProxy,
+        address _chainlinkWantToUSDPriceFeed,
+        address _chainlinkWantToETHPriceFeed
+    )
+        public
+        Strategy(
+            _vault,
+            _yVault,
+            _strategyName,
+            _ilk,
+            _gemJoin,
+            _wantToUSDOSMProxy,
+            _chainlinkWantToUSDPriceFeed,
+            _chainlinkWantToETHPriceFeed
+        )
+    {}
 
     function _liquidatePosition(uint256 _amountNeeded)
         public

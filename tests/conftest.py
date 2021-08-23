@@ -1,5 +1,5 @@
 import pytest
-from brownie import config, interface, Contract
+from brownie import config, convert, interface, Contract
 
 
 @pytest.fixture(autouse=True)
@@ -156,31 +156,95 @@ def new_dai_yvault(pm, gov, rewards, guardian, management, dai):
 
 
 @pytest.fixture
-def strategy(strategist, keeper, vault, Strategy, gov):
-    strategy = strategist.deploy(Strategy, vault)
-    strategy.setKeeper(keeper)
+def osmProxy():
+    # Allow the strategy to query the OSM proxy
+    YFItoUSDOSMProxy = Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
+    yield YFItoUSDOSMProxy
+
+
+@pytest.fixture
+def gemJoinAdapter():
+    gemJoin = Contract("0x3ff33d9162aD47660083D7DC4bC02Fb231c81677")
+    yield gemJoin
+
+
+@pytest.fixture
+def strategy(vault, Strategy, gov, osmProxy, cloner):
+    strategy = Strategy.at(cloner.original())
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # Allow the strategy to query the OSM proxy
-    YFItoUSDOSMProxy = Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
-    YFItoUSDOSMProxy.set_user(strategy, True, {"from": gov})
-
+    osmProxy.set_user(strategy, True, {"from": gov})
     yield strategy
 
 
 @pytest.fixture
-def test_strategy(strategist, keeper, vault, TestStrategy, gov):
-    strategy = strategist.deploy(TestStrategy, vault)
-    strategy.setKeeper(keeper)
+def test_strategy(
+    TestStrategy,
+    strategist,
+    vault,
+    yvault,
+    token,
+    gemJoinAdapter,
+    osmProxy,
+    price_oracle_usd,
+    price_oracle_eth,
+    gov,
+):
+    strategy = strategist.deploy(
+        TestStrategy,
+        vault,
+        yvault,
+        f"StrategyMaker{token.symbol()}",
+        "0x5946492d41000000000000000000000000000000000000000000000000000000",
+        gemJoinAdapter,
+        osmProxy,
+        price_oracle_usd,
+        price_oracle_eth,
+    )
+
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # Allow the strategy to query the OSM proxy
-    YFItoUSDOSMProxy = Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
-    YFItoUSDOSMProxy.set_user(strategy, True, {"from": gov})
-
+    osmProxy.set_user(strategy, True, {"from": gov})
     yield strategy
 
 
 @pytest.fixture(scope="session")
 def RELATIVE_APPROX():
     yield 1e-5
+
+
+# Obtaining the bytes32 ilk (verify its validity before using)
+# >>> ilk = ""
+# >>> for i in "YFI-A":
+# ...   ilk += hex(ord(i)).replace("0x","")
+# ...
+# >>> ilk += "0"*(64-len(ilk))
+# >>>
+# >>> ilk
+# '5946492d41000000000000000000000000000000000000000000000000000000'
+@pytest.fixture
+def cloner(
+    strategist,
+    vault,
+    yvault,
+    token,
+    gemJoinAdapter,
+    osmProxy,
+    price_oracle_usd,
+    price_oracle_eth,
+    MakerDaiDelegateCloner,
+):
+    cloner = strategist.deploy(
+        MakerDaiDelegateCloner,
+        vault,
+        yvault,
+        f"StrategyMaker{token.symbol()}",
+        "0x5946492d41000000000000000000000000000000000000000000000000000000",
+        gemJoinAdapter,
+        osmProxy,
+        price_oracle_usd,
+        price_oracle_eth,
+    )
+    yield cloner

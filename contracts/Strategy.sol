@@ -26,25 +26,6 @@ contract Strategy is BaseStrategy {
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
 
-    // Token Adapter Module for collateral
-    address internal constant gemJoinAdapter =
-        0x3ff33d9162aD47660083D7DC4bC02Fb231c81677;
-
-    // Maker Oracle Security Module
-    OracleSecurityModule public constant YFItoUSDOSMProxy =
-        OracleSecurityModule(0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f);
-
-    // Use Chainlink oracle to obtain latest YFI/ETH price
-    AggregatorInterface internal constant chainlinkYFItoETHPriceFeed =
-        AggregatorInterface(0x7c5d4F8345e66f68099581Db340cd65B078C41f4);
-
-    // Use Chainlink oracle to obtain latest YFI/USD price
-    AggregatorInterface internal constant chainlinkYFItoUSDPriceFeed =
-        AggregatorInterface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
-
-    // DAI yVault
-    IVault public yVault = IVault(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
-
     // DAI token
     IERC20 internal constant investmentToken =
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -55,11 +36,26 @@ contract Strategy is BaseStrategy {
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
+    // Token Adapter Module for collateral
+    address public gemJoinAdapter;
+
+    // Maker Oracle Security Module
+    OracleSecurityModule public wantToUSDOSMProxy;
+
+    // Use Chainlink oracle to obtain latest want/ETH price
+    AggregatorInterface public chainlinkWantToETHPriceFeed;
+
+    // Use Chainlink oracle to obtain latest want/USD price
+    AggregatorInterface public chainlinkWantToUSDPriceFeed;
+
+    // DAI yVault
+    IVault public yVault;
+
     // SushiSwap router
-    ISwap public router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+    ISwap public router;
 
     // Collateral type
-    bytes32 public ilk = "YFI-A";
+    bytes32 public ilk;
 
     // Our vault identifier
     uint256 public cdpId;
@@ -71,12 +67,93 @@ contract Strategy is BaseStrategy {
     uint256 public rebalanceTolerance;
 
     // Maximum acceptable lost on withdrawal. Default to 0.01%.
-    uint256 public maxLoss = 1;
+    uint256 public maxLoss;
 
     // If set to true the strategy will never try to repay debt by selling want
     bool public leaveDebtBehind;
 
-    constructor(address _vault) public BaseStrategy(_vault) {
+    // Name of the strategy
+    string internal strategyName;
+
+    // ----------------- INIT FUNCTIONS TO SUPPORT CLONING -----------------
+
+    constructor(
+        address _vault,
+        address _yVault,
+        string memory _strategyName,
+        bytes32 _ilk,
+        address _gemJoin,
+        address _wantToUSDOSMProxy,
+        address _chainlinkWantToUSDPriceFeed,
+        address _chainlinkWantToETHPriceFeed
+    ) public BaseStrategy(_vault) {
+        _initializeThis(
+            _yVault,
+            _strategyName,
+            _ilk,
+            _gemJoin,
+            _wantToUSDOSMProxy,
+            _chainlinkWantToUSDPriceFeed,
+            _chainlinkWantToETHPriceFeed
+        );
+    }
+
+    function initialize(
+        address _vault,
+        address _yVault,
+        string memory _strategyName,
+        bytes32 _ilk,
+        address _gemJoin,
+        address _wantToUSDOSMProxy,
+        address _chainlinkWantToUSDPriceFeed,
+        address _chainlinkWantToETHPriceFeed
+    ) public {
+        // Make sure we only initialize one time
+        assert(bytes(strategyName).length == 0);
+        assert(ilk == 0);
+        assert(collateralizationRatio == 0);
+
+        address sender = msg.sender;
+
+        // Initialize BaseStrategy
+        _initialize(_vault, sender, sender, sender);
+
+        // Initialize cloned instance
+        _initializeThis(
+            _yVault,
+            _strategyName,
+            _ilk,
+            _gemJoin,
+            _wantToUSDOSMProxy,
+            _chainlinkWantToUSDPriceFeed,
+            _chainlinkWantToETHPriceFeed
+        );
+    }
+
+    function _initializeThis(
+        address _yVault,
+        string memory _strategyName,
+        bytes32 _ilk,
+        address _gemJoin,
+        address _wantToUSDOSMProxy,
+        address _chainlinkWantToUSDPriceFeed,
+        address _chainlinkWantToETHPriceFeed
+    ) internal {
+        yVault = IVault(_yVault);
+        strategyName = _strategyName;
+        ilk = _ilk;
+        gemJoinAdapter = _gemJoin;
+        wantToUSDOSMProxy = OracleSecurityModule(_wantToUSDOSMProxy);
+        chainlinkWantToUSDPriceFeed = AggregatorInterface(
+            _chainlinkWantToUSDPriceFeed
+        );
+        chainlinkWantToETHPriceFeed = AggregatorInterface(
+            _chainlinkWantToETHPriceFeed
+        );
+
+        // Set default router to SushiSwap
+        router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+
         cdpId = MakerDaiDelegateLib.openCdp(ilk);
         require(cdpId > 0);
 
@@ -153,7 +230,7 @@ contract Strategy is BaseStrategy {
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {
-        return "StrategyMakerYFI";
+        return strategyName;
     }
 
     function delegatedAssets() external view override returns (uint256) {
@@ -378,7 +455,7 @@ contract Strategy is BaseStrategy {
         returns (uint256)
     {
         // YFI price in ETH with 18 decimals
-        uint256 price = uint256(chainlinkYFItoETHPriceFeed.latestAnswer());
+        uint256 price = uint256(chainlinkWantToETHPriceFeed.latestAnswer());
         return _amtInWei.mul(WAD).div(price);
     }
 
@@ -599,8 +676,8 @@ contract Strategy is BaseStrategy {
         uint256 minPrice;
 
         // Assume we are white-listed in the OSM
-        (uint256 current, bool isCurrentValid) = YFItoUSDOSMProxy.peek();
-        (uint256 future, bool isFutureValid) = YFItoUSDOSMProxy.peep();
+        (uint256 current, bool isCurrentValid) = wantToUSDOSMProxy.peek();
+        (uint256 future, bool isFutureValid) = wantToUSDOSMProxy.peep();
 
         if (isCurrentValid && isFutureValid) {
             minPrice = Math.min(future, current);
@@ -608,7 +685,7 @@ contract Strategy is BaseStrategy {
 
         // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
         uint256 chainLinkPrice =
-            uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
+            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()) * 1e10;
 
         // Return the worst price available in [wad]
         // par is crucial to this calculation as it defines the relationship between DAI and

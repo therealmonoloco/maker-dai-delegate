@@ -3,7 +3,7 @@ import pytest
 from brownie import reverts
 
 
-def test_operation(chain, token, vault, strategy, user, amount, RELATIVE_APPROX):
+def test_operation(chain, token, vault, strategy, user, amount, gov, RELATIVE_APPROX):
     # Deposit to the vault
     user_balance_before = token.balanceOf(user)
     token.approve(vault.address, amount, {"from": user})
@@ -12,11 +12,11 @@ def test_operation(chain, token, vault, strategy, user, amount, RELATIVE_APPROX)
 
     # harvest
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     # tend()
-    strategy.tend()
+    strategy.tend({"from": gov})
 
     # withdrawal
     vault.withdraw({"from": user})
@@ -25,23 +25,35 @@ def test_operation(chain, token, vault, strategy, user, amount, RELATIVE_APPROX)
     )
 
 
-def test_emergency_exit(chain, token, vault, strategy, user, amount, RELATIVE_APPROX):
+def test_emergency_exit(
+    chain, token, vault, strategy, user, amount, gov, RELATIVE_APPROX
+):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     # set emergency and exit
-    strategy.setEmergencyExit()
+    strategy.setEmergencyExit({"from": gov})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert strategy.estimatedTotalAssets() < amount
 
 
 def test_profitable_harvest(
-    chain, token, vault, yvDAI, dai, dai_whale, strategy, user, amount, RELATIVE_APPROX
+    chain,
+    token,
+    vault,
+    yvDAI,
+    dai,
+    dai_whale,
+    strategy,
+    user,
+    amount,
+    gov,
+    RELATIVE_APPROX,
 ):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
@@ -50,7 +62,7 @@ def test_profitable_harvest(
 
     # Harvest 1: Send funds through the strategy
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     # Sleep for 60 days
@@ -62,7 +74,7 @@ def test_profitable_harvest(
     dai.transfer(yvDAI, yvDAI.totalAssets() * 0.05, {"from": dai_whale})
 
     # Harvest 2: Realize profit
-    strategy.harvest()
+    strategy.harvest({"from": gov})
 
     chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
     chain.mine(1)
@@ -79,19 +91,19 @@ def test_change_debt(chain, gov, token, vault, strategy, user, amount, RELATIVE_
     vault.deposit(amount, {"from": user})
     vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     half = int(amount / 2)
 
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
 
     vault.updateStrategyDebtRatio(strategy.address, 10_000, {"from": gov})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
 
 
@@ -132,7 +144,7 @@ def test_triggers(chain, gov, vault, strategy, token, amount, user):
     vault.deposit(amount, {"from": user})
     vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
     chain.sleep(1)
-    strategy.harvest()
+    strategy.harvest({"from": gov})
 
     strategy.harvestTrigger(0)
     strategy.tendTrigger(0)

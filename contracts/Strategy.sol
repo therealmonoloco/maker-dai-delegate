@@ -75,6 +75,8 @@ contract Strategy is BaseStrategy {
     // Name of the strategy
     string internal strategyName;
 
+    // ----------------- INIT FUNCTIONS TO SUPPORT CLONING -----------------
+
     constructor(
         address _vault,
         address _yVault,
@@ -85,6 +87,38 @@ contract Strategy is BaseStrategy {
         address _chainlinkWantToUSDPriceFeed,
         address _chainlinkWantToETHPriceFeed
     ) public BaseStrategy(_vault) {
+        _initializeThis(
+            _yVault,
+            _strategyName,
+            _ilk,
+            _gemJoin,
+            _wantToUSDOSMProxy,
+            _chainlinkWantToUSDPriceFeed,
+            _chainlinkWantToETHPriceFeed
+        );
+    }
+
+    function initialize(
+        address _vault,
+        address _yVault,
+        string memory _strategyName,
+        bytes32 _ilk,
+        address _gemJoin,
+        address _wantToUSDOSMProxy,
+        address _chainlinkWantToUSDPriceFeed,
+        address _chainlinkWantToETHPriceFeed
+    ) public {
+        // Make sure we only initialize one time
+        assert(bytes(strategyName).length == 0);
+        assert(ilk == 0);
+        assert(collateralizationRatio == 0);
+
+        address sender = msg.sender;
+
+        // Initialize BaseStrategy
+        _initialize(_vault, sender, sender, sender);
+
+        // Initialize cloned instance
         _initializeThis(
             _yVault,
             _strategyName,
@@ -133,38 +167,6 @@ contract Strategy is BaseStrategy {
 
         // If we lose money in yvDAI then we are OK selling want to repay it
         leaveDebtBehind = false;
-    }
-
-    function initialize(
-        address _vault,
-        address _yVault,
-        string memory _strategyName,
-        bytes32 _ilk,
-        address _gemJoin,
-        address _wantToUSDOSMProxy,
-        address _chainlinkWantToUSDPriceFeed,
-        address _chainlinkWantToETHPriceFeed
-    ) public {
-        // Make sure we only initialize one time
-        assert(bytes(strategyName).length == 0);
-        assert(ilk == 0);
-        assert(collateralizationRatio == 0);
-
-        address sender = msg.sender;
-
-        // Initialize BaseStrategy
-        _initialize(_vault, sender, sender, sender);
-
-        // Initialize cloned instance
-        _initializeThis(
-            _yVault,
-            _strategyName,
-            _ilk,
-            _gemJoin,
-            _wantToUSDOSMProxy,
-            _chainlinkWantToUSDPriceFeed,
-            _chainlinkWantToETHPriceFeed
-        );
     }
 
     // ----------------- SETTERS & MIGRATION -----------------

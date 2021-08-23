@@ -18,6 +18,10 @@ library MakerDaiDelegateLib {
     ManagerLike internal constant manager =
         ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
 
+    // Token Adapter Module for collateral
+    DaiJoinLike internal constant daiJoin =
+        DaiJoinLike(0x9759A6Ac90977b93B58547b4A71c78317f391A28);
+
     // Liaison between oracles and core Maker contracts
     SpotLike internal constant spotter =
         SpotLike(0x65C79fcB50Ca1594B025960e539eD7A9a6D434A3);
@@ -47,8 +51,7 @@ library MakerDaiDelegateLib {
     // Deposits collateral (gem) and mints DAI
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
     function lockGemAndDraw(
-        GemJoinLike gemJoin,
-        DaiJoinLike daiJoin,
+        address gemJoin,
         uint256 cdpId,
         uint256 collateralAmount,
         uint256 daiToMint,
@@ -63,7 +66,7 @@ library MakerDaiDelegateLib {
         }
 
         // Takes token amount from the strategy and joins into the vat
-        gemJoin.join(urn, collateralAmount);
+        GemJoinLike(gemJoin).join(urn, collateralAmount);
 
         // Locks token amount into the CDP and generates debt
         manager.frob(
@@ -85,8 +88,7 @@ library MakerDaiDelegateLib {
     // Returns DAI to decrease debt and attempts to unlock any amount of collateral
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L758
     function wipeAndFreeGem(
-        GemJoinLike gemJoin,
-        DaiJoinLike daiJoin,
+        address gemJoin,
         uint256 cdpId,
         uint256 collateralAmount,
         uint256 daiToRepay
@@ -113,7 +115,7 @@ library MakerDaiDelegateLib {
         manager.flux(cdpId, address(this), collateralAmount);
 
         // Exits token amount to the strategy as a token
-        gemJoin.exit(address(this), collateralAmount);
+        GemJoinLike(gemJoin).exit(address(this), collateralAmount);
     }
 
     function debtFloor(bytes32 ilk) public view returns (uint256) {
@@ -211,6 +213,10 @@ library MakerDaiDelegateLib {
         autoLine.exec(ilk);
     }
 
+    function daiJoinAddress() public view returns (address) {
+        return address(daiJoin);
+    }
+
     // ----------------- INTERNAL FUNCTIONS -----------------
 
     function _forceMintWithinLimits(
@@ -288,13 +294,13 @@ library MakerDaiDelegateLib {
         dart = uint256(dart) <= art ? -dart : -int256(art);
     }
 
-    function convertTo18(GemJoinLike gemJoin, uint256 amt)
+    function convertTo18(address gemJoin, uint256 amt)
         internal
         returns (uint256 wad)
     {
         // For those collaterals that have less than 18 decimals precision we need to do the conversion before
         // passing to frob function
         // Adapters will automatically handle the difference of precision
-        wad = amt.mul(10**(18 - gemJoin.dec()));
+        wad = amt.mul(10**(18 - GemJoinLike(gemJoin).dec()));
     }
 }

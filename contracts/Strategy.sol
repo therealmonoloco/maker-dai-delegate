@@ -14,7 +14,6 @@ import {
 import "./libraries/MakerDaiDelegateLib.sol";
 
 import "../interfaces/chainlink/AggregatorInterface.sol";
-import "../interfaces/maker/IMaker.sol";
 import "../interfaces/swap/ISwap.sol";
 import "../interfaces/yearn/IVault.sol";
 
@@ -28,12 +27,8 @@ contract Strategy is BaseStrategy {
     uint256 internal constant RAY = 10**27;
 
     // Token Adapter Module for collateral
-    DaiJoinLike internal constant daiJoinAdapter =
-        DaiJoinLike(0x9759A6Ac90977b93B58547b4A71c78317f391A28);
-
-    // Token Adapter Module for collateral
-    GemJoinLike internal constant gemJoinAdapter =
-        GemJoinLike(0x3ff33d9162aD47660083D7DC4bC02Fb231c81677);
+    address internal constant gemJoinAdapter =
+        0x3ff33d9162aD47660083D7DC4bC02Fb231c81677;
 
     // Maker Oracle Security Module
     OracleSecurityModule public constant YFItoUSDOSMProxy =
@@ -483,7 +478,7 @@ contract Strategy is BaseStrategy {
         amount = Math.min(amount, debt);
 
         _checkAllowance(
-            address(daiJoinAdapter),
+            MakerDaiDelegateLib.daiJoinAddress(),
             address(investmentToken),
             amount
         );
@@ -539,7 +534,7 @@ contract Strategy is BaseStrategy {
             return;
         }
 
-        _checkAllowance(address(gemJoinAdapter), address(want), amount);
+        _checkAllowance(gemJoinAdapter, address(want), amount);
 
         uint256 price = _getWantTokenPrice();
         uint256 daiToMint =
@@ -655,7 +650,6 @@ contract Strategy is BaseStrategy {
     ) internal {
         MakerDaiDelegateLib.lockGemAndDraw(
             gemJoinAdapter,
-            daiJoinAdapter,
             cdpId,
             collateralAmount,
             daiToMint,
@@ -669,7 +663,6 @@ contract Strategy is BaseStrategy {
     ) internal {
         MakerDaiDelegateLib.wipeAndFreeGem(
             gemJoinAdapter,
-            daiJoinAdapter,
             cdpId,
             collateralAmount,
             daiToRepay

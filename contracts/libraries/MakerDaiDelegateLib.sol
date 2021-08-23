@@ -36,14 +36,18 @@ library MakerDaiDelegateLib {
 
     // ----------------- PUBLIC FUNCTIONS -----------------
 
+    // Creates an UrnHandler (cdp) for a specific ilk and allows to manage it via the internal
+    // registry of the manager.
     function openCdp(bytes32 ilk) public returns (uint256) {
         return manager.open(ilk, address(this));
     }
 
+    // Moves cdpId collateral balance and debt to newCdpId.
     function shiftCdp(uint256 cdpId, uint256 newCdpId) public {
         manager.shift(cdpId, newCdpId);
     }
 
+    // Transfers the ownership of cdp to recipient address in the manager registry.
     function transferCdp(uint256 cdpId, address recipient) public {
         manager.give(cdpId, recipient);
     }

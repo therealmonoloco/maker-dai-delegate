@@ -26,6 +26,16 @@ contract Strategy is BaseStrategy {
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
 
+    // DAI token
+    IERC20 internal constant investmentToken =
+        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+
+    // 100%
+    uint256 internal constant MAX_BPS = WAD;
+
+    // Wrapped Ether - Used for swaps routing
+    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
     // Token Adapter Module for collateral
     address public gemJoinAdapter;
 
@@ -40,16 +50,6 @@ contract Strategy is BaseStrategy {
 
     // DAI yVault
     IVault public yVault;
-
-    // DAI token
-    IERC20 internal constant investmentToken =
-        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-
-    // 100%
-    uint256 internal constant MAX_BPS = WAD;
-
-    // Wrapped Ether - Used for swaps routing
-    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     // SushiSwap router
     ISwap public router;

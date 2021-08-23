@@ -153,13 +153,17 @@ library MakerDaiDelegateLib {
         return ink;
     }
 
-    function getPessimisticRatioOfCdpWithExternalPrice(
-        ManagerLike manager,
-        uint256 cdpId,
-        bytes32 ilk,
-        uint256 externalPrice,
-        uint256 collateralizationRatioPrecision
-    ) public view returns (uint256) {
+    // Returns value of DAI in the reference asset (e.g. $1 per DAI)
+    function getDaiPar() public view returns (uint256) {
+        // Value is returned in ray (10**27)
+        return spotter.par();
+    }
+
+    function getSpotPrice(ManagerLike manager, bytes32 ilk)
+        public
+        view
+        returns (uint256)
+    {
         VatLike vat = VatLike(manager.vat());
 
         // spot: collateral price with safety margin returned in [ray]
@@ -169,10 +173,19 @@ library MakerDaiDelegateLib {
         // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
         (, uint256 liquidationRatio) = spotter.ilks(ilk);
 
-        // Use pessimistic price to determine the worst ratio possible
-        uint256 price = spot.mul(liquidationRatio).div(RAY * 1e9); // convert ray*ray --> wad
+        // convert ray*ray to wad
+        return spot.mul(liquidationRatio).div(RAY * 1e9);
+    }
 
-        price = Math.min(price, externalPrice);
+    function getPessimisticRatioOfCdpWithExternalPrice(
+        ManagerLike manager,
+        uint256 cdpId,
+        bytes32 ilk,
+        uint256 externalPrice,
+        uint256 collateralizationRatioPrecision
+    ) public view returns (uint256) {
+        // Use pessimistic price to determine the worst ratio possible
+        uint256 price = Math.min(getSpotPrice(manager, ilk), externalPrice);
 
         uint256 totalCollateralValue =
             balanceOfCdp(manager, cdpId, ilk).mul(price).div(WAD);

@@ -609,6 +609,7 @@ contract Strategy is BaseStrategy {
         // Assume we are white-listed in the OSM
         (uint256 current, bool isCurrentValid) = YFItoUSDOSMProxy.peek();
         (uint256 future, bool isFutureValid) = YFItoUSDOSMProxy.peep();
+
         if (isCurrentValid && isFutureValid) {
             minPrice = Math.min(future, current);
         }
@@ -617,8 +618,13 @@ contract Strategy is BaseStrategy {
         uint256 chainLinkPrice =
             uint256(chainlinkYFItoUSDPriceFeed.latestAnswer()) * 1e10;
 
-        // Return the worst price available
-        return Math.min(minPrice, chainLinkPrice);
+        // Return the worst price available in [wad]
+        // par is crucial to this calculation as it defines the relationship between DAI and
+        // 1 unit of value in the price
+        return
+            Math.min(minPrice, chainLinkPrice).mul(RAY).div(
+                MakerDaiDelegateLib.getDaiPar()
+            );
     }
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {

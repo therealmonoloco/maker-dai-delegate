@@ -27,16 +27,16 @@ contract Strategy is BaseStrategy {
     uint256 internal constant RAY = 10**27;
 
     // Token Adapter Module for collateral
-    address internal gemJoinAdapter;
+    address public gemJoinAdapter;
 
     // Maker Oracle Security Module
-    OracleSecurityModule internal wantToUSDOSMProxy;
+    OracleSecurityModule public wantToUSDOSMProxy;
 
     // Use Chainlink oracle to obtain latest want/ETH price
-    AggregatorInterface internal chainlinkWantToETHPriceFeed;
+    AggregatorInterface public chainlinkWantToETHPriceFeed;
 
     // Use Chainlink oracle to obtain latest want/USD price
-    AggregatorInterface internal chainlinkWantToUSDPriceFeed;
+    AggregatorInterface public chainlinkWantToUSDPriceFeed;
 
     // DAI yVault
     IVault public yVault;

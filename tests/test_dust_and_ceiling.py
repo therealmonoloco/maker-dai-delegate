@@ -130,6 +130,80 @@ def test_large_deposit_does_not_generate_debt_over_ceiling(
     )
 
 
+def test_withdraw_everything_with_vault_in_debt_ceiling(
+    vault, test_strategy, token, token_whale, yvault, RELATIVE_APPROX
+):
+    amount = token.balanceOf(token_whale)
+
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(amount, {"from": token_whale})
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    vault.withdraw({"from": token_whale})
+
+    assert vault.strategies(test_strategy).dict()["totalDebt"] == 0
+    assert test_strategy._getCurrentMakerVaultRatio() == 0
+    assert yvault.balanceOf(test_strategy) < 1e18  # dust
+    assert pytest.approx(token.balanceOf(token_whale), rel=RELATIVE_APPROX) == amount
+
+
+def test_large_want_balance_does_not_generate_debt_over_ceiling(
+    vault, test_strategy, token, token_whale, yvault, borrow_token
+):
+    token.transfer(test_strategy, Wei("500 ether"), {"from": token_whale})
+
+    # First harvest will move profits to the vault
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    # Second harvest will send the funds through the strategy to invest
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    # Debt ceiling is ~7 million in YFI-A at this time
+    # The whale should deposit >2x that to hit the ceiling
+    assert yvault.balanceOf(test_strategy) > 0
+    assert borrow_token.balanceOf(test_strategy) == 0
+
+    # These are zero because all want is locked in Maker's vault
+    assert token.balanceOf(test_strategy) == 0
+    assert token.balanceOf(vault) == 0
+
+    # Collateral ratio should be larger due to debt being capped by ceiling
+    assert (
+        test_strategy.collateralizationRatio() * 1.01
+        < test_strategy._getCurrentMakerVaultRatio()
+    )
+
+
+def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
+    vault, test_strategy, token, token_whale, yvault
+):
+    token.transfer(test_strategy, Wei("500 ether"), {"from": token_whale})
+
+    # First harvest will move profits to the vault
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    # Second harvest will send the funds through the strategy to invest
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    investment_before = yvault.balanceOf(test_strategy)
+    ratio_before = test_strategy._getCurrentMakerVaultRatio()
+
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(token.balanceOf(token_whale), {"from": token_whale})
+    chain.sleep(1)
+    test_strategy.harvest()
+
+    assert investment_before >= yvault.balanceOf(test_strategy)
+    assert ratio_before < test_strategy._getCurrentMakerVaultRatio()
+
+
 # Fixture 'amount' is included so user has some balance
 def test_withdraw_everything_cancels_entire_debt(
     vault,

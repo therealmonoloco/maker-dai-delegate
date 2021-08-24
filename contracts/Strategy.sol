@@ -470,7 +470,10 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256)
     {
-        // YFI price in ETH with 18 decimals
+        if (address(want) == address(WETH)) {
+            return _amtInWei;
+        }
+
         uint256 price = uint256(chainlinkWantToETHPriceFeed.latestAnswer());
         return _amtInWei.mul(WAD).div(price);
     }

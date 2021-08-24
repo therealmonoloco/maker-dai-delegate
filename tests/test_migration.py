@@ -97,3 +97,26 @@ def test_yvault_migration(
         == balanceBefore
     )
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+
+def test_yvault_migration_with_no_assets(
+    token,
+    vault,
+    strategy,
+    amount,
+    user,
+    gov,
+    yvault,
+    new_dai_yvault,
+):
+
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
+    assert strategy.estimatedTotalAssets() == 0
+    strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": gov})
+
+    strategy.harvest({"from": gov})
+
+    assert new_dai_yvault.balanceOf(strategy) > 0
+    assert yvault.balanceOf(strategy) == 0

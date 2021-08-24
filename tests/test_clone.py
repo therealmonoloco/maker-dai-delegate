@@ -84,7 +84,7 @@ def test_clone(
         strategist,
         yvault,
         f"StrategyMaker{token.symbol()}",
-        "0x5946492d41000000000000000000000000000000000000000000000000000000",
+        strategy.ilk(),
         gemJoinAdapter,
         osmProxy,
         price_oracle_usd,
@@ -96,7 +96,7 @@ def test_clone(
     )
 
     # White-list the strategy in the OSM!
-    osmProxy.set_user(cloned_strategy, True, {"from": gov})
+    osmProxy.setAuthorized(cloned_strategy, {"from": gov})
 
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     vault.addStrategy(cloned_strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})

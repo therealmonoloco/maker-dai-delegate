@@ -26,7 +26,7 @@ def test_maker_vault_is_owned_by_strategy(Strategy, cloner):
 
 # At some point the ilk should be passed to the constructor.
 # Leaving this test as a sanity check.
-def test_maker_vault_collateral_should_match_strategy(Strategy, cloner):
+def DISABLED_WETH_test_maker_vault_collateral_should_match_strategy(Strategy, cloner):
     strategy = Strategy.at(cloner.original())
     assert to_string(strategy.ilk()).rstrip("\x00") == "YFI-A"
 
@@ -71,7 +71,7 @@ def test_minted_dai_should_match_collateralization_ratio(
     )
 
 
-def test_ethToWant_should_convert_to_yfi(strategy, price_oracle_eth, RELATIVE_APPROX):
+def DISABLED_WETH_test_ethToWant_should_convert_to_yfi(strategy, price_oracle_eth, RELATIVE_APPROX):
     price = price_oracle_eth.latestAnswer()
     assert pytest.approx(
         strategy.ethToWant(Wei("1 ether")), rel=RELATIVE_APPROX

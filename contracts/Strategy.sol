@@ -15,6 +15,7 @@ import "./libraries/MakerDaiDelegateLib.sol";
 
 import "../interfaces/chainlink/AggregatorInterface.sol";
 import "../interfaces/swap/ISwap.sol";
+import "../interfaces/yearn/IOSMedianizer.sol";
 import "../interfaces/yearn/IVault.sol";
 
 contract Strategy is BaseStrategy {
@@ -40,7 +41,7 @@ contract Strategy is BaseStrategy {
     address public gemJoinAdapter;
 
     // Maker Oracle Security Module
-    OracleSecurityModule public wantToUSDOSMProxy;
+    IOSMedianizer public wantToUSDOSMProxy;
 
     // Use Chainlink oracle to obtain latest want/ETH price
     AggregatorInterface public chainlinkWantToETHPriceFeed;
@@ -141,7 +142,7 @@ contract Strategy is BaseStrategy {
         strategyName = _strategyName;
         ilk = _ilk;
         gemJoinAdapter = _gemJoin;
-        wantToUSDOSMProxy = OracleSecurityModule(_wantToUSDOSMProxy);
+        wantToUSDOSMProxy = IOSMedianizer(_wantToUSDOSMProxy);
         chainlinkWantToUSDPriceFeed = AggregatorInterface(
             _chainlinkWantToUSDPriceFeed
         );
@@ -708,12 +709,10 @@ contract Strategy is BaseStrategy {
         uint256 minPrice;
 
         // Assume we are white-listed in the OSM
-        (uint256 current, bool isCurrentValid) = wantToUSDOSMProxy.peek();
-        (uint256 future, bool isFutureValid) = wantToUSDOSMProxy.peep();
+        (uint256 current, ) = wantToUSDOSMProxy.read();
+        (uint256 future, ) = wantToUSDOSMProxy.foresight();
 
-        if (isCurrentValid && isFutureValid) {
-            minPrice = Math.min(future, current);
-        }
+        minPrice = Math.min(future, current);
 
         // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
         uint256 chainLinkPrice =

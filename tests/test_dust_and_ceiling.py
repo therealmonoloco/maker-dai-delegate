@@ -7,7 +7,7 @@ def test_small_deposit_does_not_generate_debt_under_floor(
     vault, test_strategy, token, token_whale, yvault, borrow_token, gov
 ):
     price = test_strategy._getPrice()
-    floor = Wei("9_990 ether")  # assume a price floor of 10k as in YFI-A
+    floor = Wei("4_990 ether")  # assume a price floor of 5k as in ETH-C
 
     # Amount in want that generates 'floor' debt minus a treshold
     token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (
@@ -20,7 +20,7 @@ def test_small_deposit_does_not_generate_debt_under_floor(
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
-    # Debt floor is 10k for YFI-A, so the strategy should not take any debt
+    # Debt floor is 5k for ETH-C, so the strategy should not take any debt
     # with a lower deposit amount
     assert yvault.balanceOf(test_strategy) == 0
     assert borrow_token.balanceOf(test_strategy) == 0
@@ -40,7 +40,7 @@ def test_deposit_after_passing_debt_floor_generates_debt(
     vault, test_strategy, token, token_whale, yvault, borrow_token, gov, RELATIVE_APPROX
 ):
     price = test_strategy._getPrice()
-    floor = Wei("9_990 ether")  # assume a price floor of 10k as in YFI-A
+    floor = Wei("4_990 ether")  # assume a price floor of 5k as in ETH-C
 
     # Amount in want that generates 'floor' debt minus a treshold
     token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (
@@ -114,7 +114,7 @@ def test_large_deposit_does_not_generate_debt_over_ceiling(
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
-    # Debt ceiling is ~7 million in YFI-A at this time
+    # Debt ceiling is ~100 million in ETH-C at this time
     # The whale should deposit >2x that to hit the ceiling
     assert yvault.balanceOf(test_strategy) > 0
     assert borrow_token.balanceOf(test_strategy) == 0
@@ -153,7 +153,7 @@ def test_withdraw_everything_with_vault_in_debt_ceiling(
 def test_large_want_balance_does_not_generate_debt_over_ceiling(
     vault, test_strategy, token, token_whale, yvault, borrow_token, gov
 ):
-    token.transfer(test_strategy, Wei("500 ether"), {"from": token_whale})
+    token.transfer(test_strategy, Wei("250_000 ether"), {"from": token_whale})
 
     # First harvest will move profits to the vault
     chain.sleep(1)
@@ -163,7 +163,7 @@ def test_large_want_balance_does_not_generate_debt_over_ceiling(
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
-    # Debt ceiling is ~7 million in YFI-A at this time
+    # Debt ceiling is ~100 million in ETH-C at this time
     # The whale should deposit >2x that to hit the ceiling
     assert yvault.balanceOf(test_strategy) > 0
     assert borrow_token.balanceOf(test_strategy) == 0
@@ -182,7 +182,7 @@ def test_large_want_balance_does_not_generate_debt_over_ceiling(
 def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
     vault, test_strategy, token, token_whale, yvault, gov
 ):
-    token.transfer(test_strategy, Wei("500 ether"), {"from": token_whale})
+    token.transfer(test_strategy, Wei("250_000 ether"), {"from": token_whale})
 
     # First harvest will move profits to the vault
     chain.sleep(1)
@@ -237,7 +237,7 @@ def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
     test_strategy.setLeaveDebtBehind(False, {"from": gov})
 
     price = test_strategy._getPrice()
-    floor = Wei("10_100 ether")  # assume a price floor of 10k as in YFI-A
+    floor = Wei("5_100 ether")  # assume a price floor of 5k as in ETH-C
 
     # Amount in want that generates 'floor' debt minus a treshold
     token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (

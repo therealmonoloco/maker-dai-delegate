@@ -109,9 +109,9 @@ contract Strategy is BaseStrategy {
         address _chainlinkWantToETHPriceFeed
     ) public {
         // Make sure we only initialize one time
-        assert(bytes(strategyName).length == 0);
-        assert(ilk == 0);
-        assert(collateralizationRatio == 0);
+        require(bytes(strategyName).length == 0); // dev: name already initialized
+        require(ilk == 0); // dev: ilk already initialized
+        require(collateralizationRatio == 0); // dev: collat ratio already initialized
 
         address sender = msg.sender;
 
@@ -235,7 +235,7 @@ contract Strategy is BaseStrategy {
         MakerDaiDelegateLib.allowManagingCdp(cdpId, user, allow);
     }
 
-    // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
+    // ******** OVERRIDEN METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {
         return strategyName;

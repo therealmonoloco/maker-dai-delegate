@@ -155,16 +155,19 @@ contract Strategy is BaseStrategy {
         cdpId = MakerDaiDelegateLib.openCdp(ilk);
         require(cdpId > 0);
 
-        // Minimum collaterization ratio on YFI-A is 175%
-        // Use 250% as target
-        collateralizationRatio = (250 * MAX_BPS) / 100;
-
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
         // Allow additional 5% in any direction (245, 255) by default
         rebalanceTolerance = (5 * MAX_BPS) / 100;
 
-        // If we lose money in yvDAI then we are OK selling want to repay it
-        leaveDebtBehind = false;
+        // Minimum collaterization ratio on YFI-A is 175%
+        // Use 250% as target
+        collateralizationRatio = (250 * MAX_BPS) / 100;
+
+        // If we lose money in yvDAI then we are not OK selling want to repay it
+        leaveDebtBehind = true;
+
+        // Define maximum acceptable lost on withdrawal to be 0.01%.
+        maxLoss = 1;
     }
 
     // ----------------- SETTERS & MIGRATION -----------------
@@ -174,6 +177,12 @@ contract Strategy is BaseStrategy {
         external
         onlyEmergencyAuthorized
     {
+        require(
+            _collateralizationRatio.sub(rebalanceTolerance) >
+                MakerDaiDelegateLib.getLiquidationRatio(ilk).mul(MAX_BPS).div(
+                    RAY
+                )
+        );
         collateralizationRatio = _collateralizationRatio;
     }
 
@@ -182,6 +191,12 @@ contract Strategy is BaseStrategy {
         external
         onlyEmergencyAuthorized
     {
+        require(
+            collateralizationRatio.sub(_rebalanceTolerance) >
+                MakerDaiDelegateLib.getLiquidationRatio(ilk).mul(MAX_BPS).div(
+                    RAY
+                )
+        );
         rebalanceTolerance = _rebalanceTolerance;
     }
 

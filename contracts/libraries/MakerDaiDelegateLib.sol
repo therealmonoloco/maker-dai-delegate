@@ -177,15 +177,20 @@ library MakerDaiDelegateLib {
         return spotter.par();
     }
 
+    // Liquidation ratio for the given ilk returned in [ray]
+    // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
+    function getLiquidationRatio(bytes32 ilk) public view returns (uint256) {
+        (, uint256 liquidationRatio) = spotter.ilks(ilk);
+        return liquidationRatio;
+    }
+
     function getSpotPrice(bytes32 ilk) public view returns (uint256) {
         VatLike vat = VatLike(manager.vat());
 
         // spot: collateral price with safety margin returned in [ray]
         (, , uint256 spot, , ) = vat.ilks(ilk);
 
-        // Liquidation ratio for the given ilk returned in [ray]
-        // https://github.com/makerdao/dss/blob/master/src/spot.sol#L45
-        (, uint256 liquidationRatio) = spotter.ilks(ilk);
+        uint256 liquidationRatio = getLiquidationRatio(ilk);
 
         // convert ray*ray to wad
         return spot.mul(liquidationRatio).div(RAY * 1e9);

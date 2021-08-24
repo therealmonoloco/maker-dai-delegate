@@ -66,7 +66,7 @@ contract Strategy is BaseStrategy {
     // Allow the collateralization ratio to drift a bit in order to avoid cycles
     uint256 public rebalanceTolerance;
 
-    // Maximum acceptable lost on withdrawal. Default to 0.01%.
+    // Maximum acceptable loss on withdrawal. Default to 0.01%.
     uint256 public maxLoss;
 
     // If set to true the strategy will never try to repay debt by selling want
@@ -166,7 +166,7 @@ contract Strategy is BaseStrategy {
         // If we lose money in yvDAI then we are not OK selling want to repay it
         leaveDebtBehind = true;
 
-        // Define maximum acceptable lost on withdrawal to be 0.01%.
+        // Define maximum acceptable loss on withdrawal to be 0.01%.
         maxLoss = 1;
     }
 

@@ -109,9 +109,7 @@ contract Strategy is BaseStrategy {
         address _chainlinkWantToETHPriceFeed
     ) public {
         // Make sure we only initialize one time
-        require(bytes(strategyName).length == 0); // dev: name already initialized
         require(ilk == 0); // dev: ilk already initialized
-        require(collateralizationRatio == 0); // dev: collat ratio already initialized
 
         address sender = msg.sender;
 
@@ -215,16 +213,18 @@ contract Strategy is BaseStrategy {
 
     // Move yvDAI funds to a new yVault
     function migrateToNewDaiYVault(IVault newYVault) external onlyGovernance {
-        yVault.withdraw(
-            yVault.balanceOf(address(this)),
-            address(this),
-            maxLoss
-        );
+        uint256 balanceOfYVault = yVault.balanceOf(address(this));
+        if (balanceOfYVault > 0) {
+            yVault.withdraw(
+                balanceOfYVault,
+                address(this),
+                maxLoss
+            );
+        }
         investmentToken.safeApprove(address(yVault), 0);
-        investmentToken.safeApprove(address(newYVault), type(uint256).max);
-        newYVault.deposit();
 
         yVault = newYVault;
+        depositInvestmentTokenInYVault();
     }
 
     // Allow address to manage Maker's CDP
@@ -319,6 +319,10 @@ contract Strategy is BaseStrategy {
         }
 
         // If we have anything left to invest then deposit into the yVault
+        depositInvestmentTokenInYVault();
+    }
+
+    function depositInvestmentTokenInYVault() internal {
         uint256 balanceIT = balanceOfInvestmentToken();
         if (balanceIT > 0) {
             _checkAllowance(

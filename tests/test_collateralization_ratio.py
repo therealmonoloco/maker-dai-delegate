@@ -1,5 +1,5 @@
 import pytest
-from brownie import chain, reverts
+from brownie import chain, reverts, Wei
 
 
 def test_lower_target_ratio_should_take_more_debt(
@@ -153,7 +153,9 @@ def test_vault_ratio_calculation_on_withdraw(
     )
 
 
-def test_tend_trigger_conditions(vault, strategy, token, amount, user, gov):
+def test_tend_trigger_conditions(
+    vault, strategy, token, token_whale, amount, user, gov
+):
     # Initial ratio is 0 because there is no collateral locked
     assert strategy.tendTrigger(1) == False
 
@@ -191,6 +193,19 @@ def test_tend_trigger_conditions(vault, strategy, token, amount, user, gov):
     strategy.setCollateralizationRatio(
         orig_target - rebalance_tolerance * 0.999, {"from": gov}
     )
+    assert strategy.tendTrigger(1) == False
+
+    # Whale deposit so there is no more DAI available to mint should return false
+    token.transfer(strategy, Wei("500 ether"), {"from": token_whale})
+
+    # First harvest will move profits to the vault
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    # Second harvest will send the funds through the strategy to invest
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
     assert strategy.tendTrigger(1) == False
 
 

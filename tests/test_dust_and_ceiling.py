@@ -141,6 +141,7 @@ def test_withdraw_everything_with_vault_in_debt_ceiling(
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
+    test_strategy.setLeaveDebtBehind(False, {"from": gov})
     vault.withdraw({"from": token_whale})
 
     assert vault.strategies(test_strategy).dict()["totalDebt"] == 0

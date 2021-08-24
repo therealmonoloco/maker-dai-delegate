@@ -171,6 +171,8 @@ def gemJoinAdapter():
 @pytest.fixture
 def strategy(vault, Strategy, gov, osmProxy, cloner):
     strategy = Strategy.at(cloner.original())
+    strategy.setLeaveDebtBehind(False, {"from": gov})
+
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # Allow the strategy to query the OSM proxy
@@ -202,6 +204,7 @@ def test_strategy(
         price_oracle_usd,
         price_oracle_eth,
     )
+    strategy.setLeaveDebtBehind(False, {"from": gov})
 
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 

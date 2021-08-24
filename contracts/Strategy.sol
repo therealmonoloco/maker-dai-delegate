@@ -153,7 +153,7 @@ contract Strategy is BaseStrategy {
         router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
         cdpId = MakerDaiDelegateLib.openCdp(ilk);
-        require(cdpId > 0);
+        require(cdpId > 0); // dev: error opening cdp
 
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
         // Allow additional 5% in any direction (245, 255) by default
@@ -182,7 +182,7 @@ contract Strategy is BaseStrategy {
                 MakerDaiDelegateLib.getLiquidationRatio(ilk).mul(MAX_BPS).div(
                     RAY
                 )
-        );
+        ); // dev: desired collateralization ratio is too low
         collateralizationRatio = _collateralizationRatio;
     }
 
@@ -196,7 +196,7 @@ contract Strategy is BaseStrategy {
                 MakerDaiDelegateLib.getLiquidationRatio(ilk).mul(MAX_BPS).div(
                     RAY
                 )
-        );
+        ); // dev: desired rebalance tolerance makes allowed ratio too low
         rebalanceTolerance = _rebalanceTolerance;
     }
 

@@ -1,5 +1,5 @@
 import pytest
-from brownie import config, convert, interface, Contract
+from brownie import config, interface, Contract
 
 
 @pytest.fixture(autouse=True)
@@ -59,6 +59,11 @@ def token_whale(accounts):
 
 
 @pytest.fixture
+def weth_whale(accounts):
+    yield accounts.at("0xC1AAE9d18bBe386B102435a8632C8063d31e747C", force=True)
+
+
+@pytest.fixture
 def dai():
     dai_address = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
     yield Contract(dai_address)
@@ -86,31 +91,37 @@ def yvault(yvDAI):
 
 @pytest.fixture
 def price_oracle_usd():
+<<<<<<< HEAD
     chainlink_oracle = interface.AggregatorInterface(
         "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
     )
     yield chainlink_oracle
+=======
+    yield interface.AggregatorInterface("0xA027702dbb89fbd58938e4324ac03B58d812b0E1")
+>>>>>>> 2055c6d (feat: test ape tax with weth)
 
 
 @pytest.fixture
 def price_oracle_eth():
+<<<<<<< HEAD
     # WILL NOT BE USED FOR ETH
     chainlink_oracle = interface.AggregatorInterface(
         "0x7c5d4F8345e66f68099581Db340cd65B078C41f4"
     )
     yield chainlink_oracle
+=======
+    yield interface.AggregatorInterface("0x7c5d4F8345e66f68099581Db340cd65B078C41f4")
+>>>>>>> 2055c6d (feat: test ape tax with weth)
 
 
 @pytest.fixture
 def yvDAI():
-    vault_address = "0xdA816459F1AB5631232FE5e97a05BBBb94970c95"
-    yield Contract(vault_address)
+    yield Contract("0xdA816459F1AB5631232FE5e97a05BBBb94970c95")
 
 
 @pytest.fixture
 def router():
-    sushiswap_router = interface.ISwap("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
-    yield sushiswap_router
+    yield interface.ISwap("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
 
 
 @pytest.fixture
@@ -159,14 +170,22 @@ def new_dai_yvault(pm, gov, rewards, guardian, management, dai):
 @pytest.fixture
 def osmProxy():
     # Allow the strategy to query the OSM proxy
+<<<<<<< HEAD
     osm = Contract("0xCF63089A8aD2a9D8BD6Bb8022f3190EB7e1eD0f1")
     yield osm
+=======
+    yield Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
+>>>>>>> 2055c6d (feat: test ape tax with weth)
 
 
 @pytest.fixture
 def gemJoinAdapter():
+<<<<<<< HEAD
     gemJoin = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E") # ETH-C
     yield gemJoin
+=======
+    yield Contract("0x3ff33d9162aD47660083D7DC4bC02Fb231c81677")
+>>>>>>> 2055c6d (feat: test ape tax with weth)
 
 
 @pytest.fixture

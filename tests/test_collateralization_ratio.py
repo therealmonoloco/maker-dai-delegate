@@ -1,5 +1,5 @@
 import pytest
-from brownie import chain
+from brownie import chain, reverts
 
 
 def test_lower_target_ratio_should_take_more_debt(
@@ -192,3 +192,22 @@ def test_tend_trigger_conditions(vault, strategy, token, amount, user, gov):
         orig_target - rebalance_tolerance * 0.999, {"from": gov}
     )
     assert strategy.tendTrigger(1) == False
+
+
+def test_ratio_lower_than_liquidation_should_revert(strategy, gov):
+    with reverts():
+        strategy.setCollateralizationRatio(1e18, {"from": gov})
+
+
+def test_ratio_over_liquidation_but_with_tolerance_under_it_should_revert(
+    strategy, gov
+):
+    strategy.setCollateralizationRatio(2e18, {"from": gov})
+
+    with reverts():
+        strategy.setRebalanceTolerance(5e17, {"from": gov})
+
+
+def test_rebalance_tolerance_under_liquidation_ratio_should_revert(strategy, gov):
+    with reverts():
+        strategy.setRebalanceTolerance(1e18, {"from": gov})

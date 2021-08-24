@@ -698,10 +698,14 @@ contract Strategy is BaseStrategy {
         // Return the worst price available in [wad]
         // par is crucial to this calculation as it defines the relationship between DAI and
         // 1 unit of value in the price
-        return
-            Math.min(minPrice, chainLinkPrice).mul(RAY).div(
-                MakerDaiDelegateLib.getDaiPar()
-            );
+        minPrice = Math.min(minPrice, chainLinkPrice).mul(RAY).div(
+            MakerDaiDelegateLib.getDaiPar()
+        );
+
+        // If peek() or peep() return a price of 0 or an error then we are
+        // dealing with an invalid price or Maker Protocol Emergency Shutdown
+        require(minPrice > 0); // dev: invalid price returned from oracle
+        return minPrice;
     }
 
     function getCurrentMakerVaultRatio() internal view returns (uint256) {

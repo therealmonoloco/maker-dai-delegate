@@ -427,11 +427,17 @@ contract Strategy is BaseStrategy {
 
         uint256 currentRatio = getCurrentMakerVaultRatio();
 
-        // If we need to repay debt or mint more DAI and are outside the tolerance bands,
+        // If we need to repay debt and are outside the tolerance bands,
         // we do it regardless of the call cost
+        if (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) {
+            return true;
+        }
+
+        // If we could mint more DAI, check that there is DAI available to mint
+        // Otherwise do not adjust the position
         return
-            (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) ||
-            (currentRatio > collateralizationRatio.add(rebalanceTolerance));
+            (currentRatio > collateralizationRatio.add(rebalanceTolerance)) &&
+            MakerDaiDelegateLib.isDaiAvailableToMint(ilk);
     }
 
     function prepareMigration(address _newStrategy) internal override {

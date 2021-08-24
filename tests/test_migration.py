@@ -100,7 +100,14 @@ def test_yvault_migration(
 
 
 def test_yvault_migration_with_no_assets(
-    token, vault, strategy, amount, user, gov, yvault, new_dai_yvault,
+    token,
+    vault,
+    strategy,
+    amount,
+    user,
+    gov,
+    yvault,
+    new_dai_yvault,
 ):
 
     token.approve(vault.address, amount, {"from": user})

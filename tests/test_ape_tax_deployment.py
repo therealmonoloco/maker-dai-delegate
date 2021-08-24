@@ -1,24 +1,25 @@
 import pytest
 
-from brownie import reverts, ZERO_ADDRESS, chain, Contract
+from brownie import reverts, chain, Contract, Wei, ZERO_ADDRESS
 from eth_abi import encode_single
 
 
 def test_ape_tax(
     weth,
+    dai,
     yvault,
     cloner,
     strategy,
     strategist,
     weth_whale,
     dai_whale,
-    gov,
-    gemJoinAdapter,
-    osmProxy,
-    price_oracle_usd,
-    price_oracle_eth,
+    gov
 ):
     vault = Contract("0x5120FeaBd5C21883a4696dBCC5D123d6270637E9")
+    gemJoinAdapter = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E")
+    price_oracle_eth = Contract("0xCF63089A8aD2a9D8BD6Bb8022f3190EB7e1eD0f1")
+    price_oracle_usd = Contract("0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
+
     daddy = gov
     gov = vault.governance()
 
@@ -31,7 +32,7 @@ def test_ape_tax(
         f"StrategyMaker{weth.symbol()}",
         encode_single("bytes32", b"ETH-C"),
         gemJoinAdapter,
-        osmProxy,
+        ZERO_ADDRESS,
         price_oracle_usd,
         price_oracle_eth,
         {"from": strategist},

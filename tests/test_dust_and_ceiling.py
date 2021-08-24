@@ -206,16 +206,7 @@ def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
 
 # Fixture 'amount' is included so user has some balance
 def test_withdraw_everything_cancels_entire_debt(
-    vault,
-    test_strategy,
-    token,
-    token_whale,
-    user,
-    amount,
-    yvault,
-    dai,
-    dai_whale,
-    gov,
+    vault, test_strategy, token, token_whale, user, amount, yvault, dai, dai_whale, gov,
 ):
     amount_user = Wei("0.25 ether")
     amount_whale = Wei("10 ether")

@@ -199,6 +199,7 @@ library MakerDaiDelegateLib {
     ) public view returns (uint256) {
         // Use pessimistic price to determine the worst ratio possible
         uint256 price = Math.min(getSpotPrice(ilk), externalPrice);
+        require(price > 0); // dev: invalid price
 
         uint256 totalCollateralValue =
             balanceOfCdp(cdpId, ilk).mul(price).div(WAD);

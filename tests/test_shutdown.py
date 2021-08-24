@@ -76,6 +76,9 @@ def test_basic_shutdown(
     chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
     chain.mine(1)
 
+    ## Make sure we are not living any debt behind (i.e: sell want if needed)
+    test_strategy.setLeaveDebtBehind(False, {"from": strategist})
+
     ## Set emergency
     test_strategy.setEmergencyExit({"from": strategist})
 

@@ -14,6 +14,9 @@ library MakerDaiDelegateLib {
     uint256 internal constant WAD = 10**18;
     uint256 internal constant RAY = 10**27;
 
+    // Do not attempt to mint DAI if there are less than MIN_MINTABLE available
+    uint256 internal constant MIN_MINTABLE = 1000 * WAD;
+
     // Maker vaults manager
     ManagerLike internal constant manager =
         ManagerLike(0x5ef30b9986345249bc32d8928B7ee64DE9435E39);
@@ -236,8 +239,27 @@ library MakerDaiDelegateLib {
         return address(daiJoin);
     }
 
+    // Checks if there is at least MIN_MINTABLE dai available to be minted
+    function isDaiAvailableToMint(bytes32 ilk) public view returns (bool) {
+        VatLike vat = VatLike(manager.vat());
+
+        (uint256 Art, uint256 rate, , uint256 line, uint256 dust) =
+            vat.ilks(ilk);
+
+        // Total debt in [rad] (wad * ray)
+        uint256 vatDebt = Art.mul(rate);
+
+        if (vatDebt >= line || line.sub(vatDebt).div(RAY) < MIN_MINTABLE) {
+            return false;
+        }
+
+        return true;
+    }
+
     // ----------------- INTERNAL FUNCTIONS -----------------
 
+    // This function repeats some code from daiAvailableToMint because it needs
+    // to handle special cases such as not leaving debt under dust
     function _forceMintWithinLimits(
         VatLike vat,
         bytes32 ilk,
@@ -264,9 +286,14 @@ library MakerDaiDelegateLib {
 
         uint256 maxMintableDAI = line.sub(vatDebt).div(RAY);
 
+        // Avoid edge cases with low amounts of available debt
+        if (maxMintableDAI < MIN_MINTABLE) {
+            return 0;
+        }
+
         // Prevent rounding errors
         if (maxMintableDAI > WAD) {
-            maxMintableDAI = maxMintableDAI - 1;
+            maxMintableDAI = maxMintableDAI - WAD;
         }
 
         return Math.min(maxMintableDAI, desiredAmount);

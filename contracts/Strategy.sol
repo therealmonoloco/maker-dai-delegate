@@ -215,16 +215,12 @@ contract Strategy is BaseStrategy {
     function migrateToNewDaiYVault(IVault newYVault) external onlyGovernance {
         uint256 balanceOfYVault = yVault.balanceOf(address(this));
         if (balanceOfYVault > 0) {
-            yVault.withdraw(
-                balanceOfYVault,
-                address(this),
-                maxLoss
-            );
+            yVault.withdraw(balanceOfYVault, address(this), maxLoss);
         }
         investmentToken.safeApprove(address(yVault), 0);
 
         yVault = newYVault;
-        depositInvestmentTokenInYVault();
+        _depositInvestmentTokenInYVault();
     }
 
     // Allow address to manage Maker's CDP
@@ -319,20 +315,7 @@ contract Strategy is BaseStrategy {
         }
 
         // If we have anything left to invest then deposit into the yVault
-        depositInvestmentTokenInYVault();
-    }
-
-    function depositInvestmentTokenInYVault() internal {
-        uint256 balanceIT = balanceOfInvestmentToken();
-        if (balanceIT > 0) {
-            _checkAllowance(
-                address(yVault),
-                address(investmentToken),
-                balanceIT
-            );
-
-            yVault.deposit();
-        }
+        _depositInvestmentTokenInYVault();
     }
 
     function liquidatePosition(uint256 _amountNeeded)
@@ -550,6 +533,19 @@ contract Strategy is BaseStrategy {
         }
         yVault.withdraw(sharesToWithdraw, address(this), maxLoss);
         return balanceOfInvestmentToken().sub(balancePrior);
+    }
+
+    function _depositInvestmentTokenInYVault() internal {
+        uint256 balanceIT = balanceOfInvestmentToken();
+        if (balanceIT > 0) {
+            _checkAllowance(
+                address(yVault),
+                address(investmentToken),
+                balanceIT
+            );
+
+            yVault.deposit();
+        }
     }
 
     function _repayInvestmentTokenDebt(uint256 amount) internal {

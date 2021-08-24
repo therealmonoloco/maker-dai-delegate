@@ -227,6 +227,14 @@ contract Strategy is BaseStrategy {
         yVault = newYVault;
     }
 
+    // Allow address to manage Maker's CDP
+    function grantCdpManagingRightsToUser(address user, bool allow)
+        external
+        onlyGovernance
+    {
+        MakerDaiDelegateLib.allowManagingCdp(cdpId, user, allow);
+    }
+
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {

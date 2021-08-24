@@ -52,6 +52,15 @@ library MakerDaiDelegateLib {
         manager.give(cdpId, recipient);
     }
 
+    // Allow/revoke manager access to a cdp
+    function allowManagingCdp(
+        uint256 cdpId,
+        address user,
+        bool isAccessGranted
+    ) public {
+        manager.cdpAllow(cdpId, user, isAccessGranted ? 1 : 0);
+    }
+
     // Deposits collateral (gem) and mints DAI
     // Adapted from https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol#L639
     function lockGemAndDraw(

@@ -1,4 +1,4 @@
-from brownie import chain, reverts
+from brownie import chain, reverts, Contract
 
 
 def test_set_collateralization_ratio_acl(
@@ -110,6 +110,31 @@ def test_shift_cdp_acl(strategy, gov, strategist, management, guardian, user):
 
     with reverts("!authorized"):
         strategy.shiftToCdp(123, {"from": user})
+
+
+def test_allow_managing_cdp_acl(strategy, gov, strategist, management, guardian, user):
+    cdpManager = Contract("0x5ef30b9986345249bc32d8928B7ee64DE9435E39")
+    cdp = strategy.cdpId()
+
+    with reverts("!authorized"):
+        strategy.grantCdpManagingRightsToUser(user, True, {"from": strategist})
+
+    with reverts("!authorized"):
+        strategy.grantCdpManagingRightsToUser(user, True, {"from": management})
+
+    with reverts("!authorized"):
+        strategy.grantCdpManagingRightsToUser(user, True, {"from": guardian})
+
+    with reverts("!authorized"):
+        strategy.grantCdpManagingRightsToUser(user, True, {"from": user})
+
+    strategy.grantCdpManagingRightsToUser(user, True, {"from": gov})
+    cdpManager.cdpAllow(cdp, guardian, 1, {"from": user})
+
+    strategy.grantCdpManagingRightsToUser(user, False, {"from": gov})
+
+    with reverts("cdp-not-allowed"):
+        cdpManager.cdpAllow(cdp, guardian, 1, {"from": user})
 
 
 def test_migrate_dai_yvault_acl(

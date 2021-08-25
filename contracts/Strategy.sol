@@ -686,24 +686,37 @@ contract Strategy is BaseStrategy {
         return totalCollateral.sub(minCollateral);
     }
 
-    // ----------------- INTERNAL CALCS -----------------
+    // ----------------- PUBLIC BALANCES -----------------
 
-    function balanceOfWant() internal view returns (uint256) {
+    function balanceOfWant() public view returns (uint256) {
         return want.balanceOf(address(this));
     }
 
-    function balanceOfInvestmentToken() internal view returns (uint256) {
+    function balanceOfInvestmentToken() public view returns (uint256) {
         return investmentToken.balanceOf(address(this));
     }
 
-    function balanceOfDebt() internal view returns (uint256) {
+    function balanceOfDebt() public view returns (uint256) {
         return MakerDaiDelegateLib.debtForCdp(cdpId, ilk);
     }
 
     // Returns collateral balance in the vault
-    function balanceOfMakerVault() internal view returns (uint256) {
+    function balanceOfMakerVault() public view returns (uint256) {
         return MakerDaiDelegateLib.balanceOfCdp(cdpId, ilk);
     }
+
+    // Effective collateralization ratio of the vault
+    function getCurrentMakerVaultRatio() public view returns (uint256) {
+        return
+            MakerDaiDelegateLib.getPessimisticRatioOfCdpWithExternalPrice(
+                cdpId,
+                ilk,
+                _getWantTokenPrice(),
+                MAX_BPS
+            );
+    }
+
+    // ----------------- INTERNAL CALCS -----------------
 
     function _getWantTokenPrice() internal view returns (uint256) {
         uint256 minPrice;
@@ -729,16 +742,6 @@ contract Strategy is BaseStrategy {
         // dealing with an invalid price or Maker Protocol Emergency Shutdown
         require(minPrice > 0); // dev: invalid price returned from oracle
         return minPrice;
-    }
-
-    function getCurrentMakerVaultRatio() internal view returns (uint256) {
-        return
-            MakerDaiDelegateLib.getPessimisticRatioOfCdpWithExternalPrice(
-                cdpId,
-                ilk,
-                _getWantTokenPrice(),
-                MAX_BPS
-            );
     }
 
     function _valueOfInvestment() internal view returns (uint256) {

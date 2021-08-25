@@ -40,14 +40,7 @@ def test_revoke_strategy_from_strategy(
 
 
 def test_revoke_with_profit(
-    token,
-    vault,
-    strategy,
-    token_whale,
-    gov,
-    borrow_token,
-    borrow_whale,
-    yvault,
+    token, vault, strategy, token_whale, gov, borrow_token, borrow_whale, yvault,
 ):
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(20 * (10 ** token.decimals()), {"from": token_whale})

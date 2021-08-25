@@ -794,7 +794,7 @@ contract Strategy is BaseStrategy {
         return amount.mul(WAD).div(_getWantTokenPrice());
     }
 
-    function getTokenOutPath(address _token_in, address _token_out)
+    function _getTokenOutPath(address _token_in, address _token_out)
         internal
         pure
         returns (address[] memory _path)
@@ -825,7 +825,7 @@ contract Strategy is BaseStrategy {
         router.swapExactTokensForTokens(
             _amount,
             0,
-            getTokenOutPath(tokenA, tokenB),
+            _getTokenOutPath(tokenA, tokenB),
             address(this),
             now
         );
@@ -840,7 +840,7 @@ contract Strategy is BaseStrategy {
         router.swapTokensForExactTokens(
             _amount,
             type(uint256).max,
-            getTokenOutPath(address(want), address(investmentToken)),
+            _getTokenOutPath(address(want), address(investmentToken)),
             address(this),
             now
         );

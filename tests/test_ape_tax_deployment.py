@@ -13,13 +13,13 @@ def test_ape_tax(
     strategist,
     weth_whale,
     dai_whale,
-    gov
+    gov,
+    gemJoinAdapter,
+    osmProxy,
+    price_oracle_usd,
+    price_oracle_eth,
 ):
     vault = Contract("0x5120FeaBd5C21883a4696dBCC5D123d6270637E9")
-    gemJoinAdapter = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E")
-    price_oracle_eth = Contract("0xCF63089A8aD2a9D8BD6Bb8022f3190EB7e1eD0f1")
-    price_oracle_usd = Contract("0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
-
     daddy = gov
     gov = vault.governance()
 
@@ -32,7 +32,7 @@ def test_ape_tax(
         f"StrategyMaker{weth.symbol()}",
         encode_single("bytes32", b"ETH-C"),
         gemJoinAdapter,
-        ZERO_ADDRESS,
+        osmProxy,
         price_oracle_usd,
         price_oracle_eth,
         {"from": strategist},
@@ -43,7 +43,7 @@ def test_ape_tax(
     )
 
     # White-list the strategy in the OSM!
-    osmProxy.set_user(cloned_strategy, True, {"from": daddy})
+    osmProxy.setAuthorized(cloned_strategy, {"from": daddy})
 
     # Reduce other strategies debt allocation
     for i in range(0, 20):
@@ -61,22 +61,56 @@ def test_ape_tax(
     cloned_strategy.harvest({"from": gov})
     assert yvault.balanceOf(cloned_strategy) > 0
 
+    print(f"After first harvest")
+    print(
+        f"strat estimatedTotalAssets: {cloned_strategy.estimatedTotalAssets()/1e18:_}"
+    )
+    print(f"strat balanceOf yvDAI: {yvault.balanceOf(cloned_strategy)/1e18:_}")
+    print(
+        f"strat balanceOf DAI: {(yvault.balanceOf(cloned_strategy)/1e18 * yvault.pricePerShare()/1e18):_}"
+    )
+    print(f"strat _valueOfInvestment: {cloned_strategy._valueOfInvestment()/1e18:_}")
+    print(f"strat balanceOf debt: {cloned_strategy.balanceOfDebt()/1e18:_}")
+
     # Sleep for 2 days
     chain.sleep(60 * 60 * 24 * 2)
     chain.mine(1)
 
     # Send some profit to yvDAI
-    dai.transfer(yvault, Wei("100_000 ether"), {"from": dai_whale})
-    cloned_strategy.harvest({"from": gov})
+    dai.transfer(yvault, yvault.totalDebt() * 1.01, {"from": dai_whale})
+    cloned_strategy.setLeaveDebtBehind(False, {"from": gov})
+    tx = cloned_strategy.harvest({"from": gov})
+
+    print(f"After second harvest")
+    print(
+        f"strat estimatedTotalAssets: {cloned_strategy.estimatedTotalAssets()/1e18:_}"
+    )
+    print(f"strat balanceOf yvDAI: {yvault.balanceOf(cloned_strategy)/1e18:_}")
+    print(
+        f"strat balanceOf DAI: {(yvault.balanceOf(cloned_strategy)/1e18 * yvault.pricePerShare()/1e18):_}"
+    )
+    print(f"strat _valueOfInvestment: {cloned_strategy._valueOfInvestment()/1e18:_}")
+    print(f"strat balanceOf debt: {cloned_strategy.balanceOfDebt()/1e18:_}")
 
     assert vault.strategies(cloned_strategy).dict()["totalGain"] > 0
     assert vault.strategies(cloned_strategy).dict()["totalLoss"] == 0
-
     chain.sleep(60 * 60 * 8)
     chain.mine(1)
 
     vault.updateStrategyDebtRatio(cloned_strategy, 0, {"from": gov})
     cloned_strategy.harvest({"from": gov})
 
-    assert vault.strategies(cloned_strategy).dict()["totalLoss"] == 0
+    print(f"After third harvest")
+    print(
+        f"strat estimatedTotalAssets: {cloned_strategy.estimatedTotalAssets()/1e18:_}"
+    )
+    print(f"strat balanceOf yvDAI: {yvault.balanceOf(cloned_strategy)/1e18:_}")
+    print(
+        f"strat balanceOf DAI: {(yvault.balanceOf(cloned_strategy)/1e18 * yvault.pricePerShare()/1e18):_}"
+    )
+    print(f"strat _valueOfInvestment: {cloned_strategy._valueOfInvestment()/1e18:_}")
+    print(f"strat balanceOf debt: {cloned_strategy.balanceOfDebt()/1e18:_}")
+    print(f"totalLoss: {vault.strategies(cloned_strategy).dict()['totalLoss']/1e18:_}")
+
+    assert vault.strategies(cloned_strategy).dict()["totalLoss"] < Wei("0.5 ether")
     assert vault.strategies(cloned_strategy).dict()["totalDebt"] == 0

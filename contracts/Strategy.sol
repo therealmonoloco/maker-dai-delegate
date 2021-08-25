@@ -266,6 +266,7 @@ contract Strategy is BaseStrategy {
                 .sub(_convertInvestmentTokenToWant(balanceOfDebt()));
     }
 
+    event Debug(uint256 step, uint256 value);
     function prepareReturn(uint256 _debtOutstanding)
         internal
         override
@@ -276,10 +277,13 @@ contract Strategy is BaseStrategy {
         )
     {
         uint256 totalDebt = vault.strategies(address(this)).totalDebt;
-
+        emit Debug(0, _valueOfInvestment());
+        emit Debug(1, balanceOfDebt());
         // Claim rewards from yVault
         _takeYVaultProfit();
 
+        emit Debug(2, _valueOfInvestment());
+        emit Debug(3, balanceOfDebt());
         uint256 totalAssetsAfterProfit = estimatedTotalAssets();
 
         _profit = totalAssetsAfterProfit > totalDebt
@@ -386,7 +390,7 @@ contract Strategy is BaseStrategy {
             // Very small numbers may round to 0 'want' to use for buying investment token
             // Enforce a minimum of $1 to swap in order to avoid this
             uint256 investmentLeftToAcquire =
-                balanceOfDebt().add(WAD).sub(currentInvestmentValue);
+                balanceOfDebt().sub(currentInvestmentValue);
 
             uint256 investmentLeftToAcquireInWant =
                 _convertInvestmentTokenToWant(investmentLeftToAcquire);
@@ -696,7 +700,7 @@ contract Strategy is BaseStrategy {
         return investmentToken.balanceOf(address(this));
     }
 
-    function balanceOfDebt() internal view returns (uint256) {
+    function balanceOfDebt() public view returns (uint256) {
         return MakerDaiDelegateLib.debtForCdp(cdpId, ilk);
     }
 
@@ -741,7 +745,7 @@ contract Strategy is BaseStrategy {
             );
     }
 
-    function _valueOfInvestment() internal view returns (uint256) {
+    function _valueOfInvestment() public view returns (uint256) {
         return
             yVault.balanceOf(address(this)).mul(yVault.pricePerShare()).div(
                 10**yVault.decimals()

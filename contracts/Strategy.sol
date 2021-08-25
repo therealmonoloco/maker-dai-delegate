@@ -386,7 +386,7 @@ contract Strategy is BaseStrategy {
             // Very small numbers may round to 0 'want' to use for buying investment token
             // Enforce a minimum of $1 to swap in order to avoid this
             uint256 investmentLeftToAcquire =
-                balanceOfDebt().add(WAD).sub(currentInvestmentValue);
+                balanceOfDebt().sub(currentInvestmentValue);
 
             uint256 investmentLeftToAcquireInWant =
                 _convertInvestmentTokenToWant(investmentLeftToAcquire);

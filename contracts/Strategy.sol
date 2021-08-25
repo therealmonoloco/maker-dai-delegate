@@ -374,10 +374,9 @@ contract Strategy is BaseStrategy {
         amountToFree = Math.min(amountToFree, _maxWithdrawal());
         _freeCollateralAndRepayDai(amountToFree, 0);
 
-        // If we are liquidating all positions and were not able to pay the debt in full,
-        // we may need to unlock some collateral to sell
+        // If we still need more want to repay, we may need to unlock some collateral to sell
         if (
-            _amountNeeded > amountToFree &&
+            balanceOfWant() < _amountNeeded &&
             balanceOfDebt() > 0 &&
             !leaveDebtBehind
         ) {

@@ -56,7 +56,7 @@ def test_ape_tax(
     vault.addStrategy(cloned_strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
 
     weth.approve(vault, 2 ** 256 - 1, {"from": weth_whale})
-    vault.deposit(10 * (10 ** weth.decimals()), {"from": weth_whale})
+    vault.deposit(1 * (10 ** weth.decimals()), {"from": weth_whale})
 
     cloned_strategy.harvest({"from": gov})
     assert yvault.balanceOf(cloned_strategy) > 0

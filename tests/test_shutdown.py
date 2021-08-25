@@ -87,5 +87,5 @@ def test_basic_shutdown(
 
     assert vault.strategies(test_strategy).dict()["debtRatio"] == 0
     assert vault.strategies(test_strategy).dict()["totalDebt"] == 0
-    assert token.balanceOf(test_strategy)/1e18 < 0.00001 # dust
+    assert token.balanceOf(test_strategy) / 1e18 < 0.00001  # dust
     assert token.balanceOf(vault) >= amount  ## The vault has all funds

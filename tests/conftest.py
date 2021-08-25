@@ -55,7 +55,14 @@ def token():
 
 @pytest.fixture
 def token_whale(accounts):
-    yield accounts.at("0x030bA81f1c18d280636F32af80b9AAd02Cf0854e", force=True) # AAVE aWETH
+    yield accounts.at(
+        "0x030bA81f1c18d280636F32af80b9AAd02Cf0854e", force=True
+    )  # AAVE aWETH
+
+
+@pytest.fixture
+def weth_whale(accounts):
+    yield accounts.at("0xC1AAE9d18bBe386B102435a8632C8063d31e747C", force=True)
 
 
 @pytest.fixture
@@ -165,7 +172,7 @@ def osmProxy():
 
 @pytest.fixture
 def gemJoinAdapter():
-    gemJoin = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E") # ETH-C
+    gemJoin = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E")  # ETH-C
     yield gemJoin
 
 

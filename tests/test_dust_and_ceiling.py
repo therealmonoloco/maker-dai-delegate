@@ -16,16 +16,19 @@ def test_small_deposit_does_not_generate_debt_under_floor(
 
     # Deposit to the vault and send funds through the strategy
     token.approve(vault.address, token_floor, {"from": token_whale})
+
     vault.deposit(token_floor, {"from": token_whale})
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
     # Debt floor is 5k for ETH-C, so the strategy should not take any debt
     # with a lower deposit amount
+    assert test_strategy.balanceOfDebt() == 0
     assert yvault.balanceOf(test_strategy) == 0
     assert borrow_token.balanceOf(test_strategy) == 0
 
     # These are zero because all want is locked in Maker's vault
+    assert test_strategy.balanceOfMakerVault() == token_floor
     assert token.balanceOf(test_strategy) == 0
     assert token.balanceOf(vault) == 0
 
@@ -55,16 +58,22 @@ def test_deposit_after_passing_debt_floor_generates_debt(
 
     # Debt floor is 10k for YFI-A, so the strategy should not take any debt
     # with a lower deposit amount
+    assert test_strategy.balanceOfDebt() == 0
     assert yvault.balanceOf(test_strategy) == 0
     assert borrow_token.balanceOf(test_strategy) == 0
+    assert test_strategy.balanceOfMakerVault() == token_floor
 
     # Deposit enough want token to go over the dust
-    vault.deposit(Wei("0.5 ether"), {"from": token_whale})
+    additional_deposit = Wei("0.5 ether")
+
+    vault.deposit(additional_deposit, {"from": token_whale})
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
     # Ensure that we have now taken on debt and deposited into yVault
     assert yvault.balanceOf(test_strategy) > 0
+    assert test_strategy.balanceOfDebt() > 0
+    assert test_strategy.balanceOfMakerVault() == token_floor + additional_deposit
 
     # Collateral with no debt should be a high ratio
     assert (

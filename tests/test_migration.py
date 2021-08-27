@@ -51,6 +51,7 @@ def test_migration(
     new_strategy.shiftToCdp(orig_cdp_id, {"from": gov})
     new_strategy.harvest({"from": gov})
 
+    assert new_strategy.balanceOfMakerVault() == amount
     assert (
         pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
         == amount

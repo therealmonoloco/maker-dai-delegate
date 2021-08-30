@@ -28,7 +28,7 @@ def print_monitoring_info_for_strategy(s):
         print(f"Current loss is {(debt - value)/1e18:.2f} Dai")
 
     print(
-        f"Current {want.symbol()} spot price is {maker_dai_delegate.getSpotPrice(s.ilk())/1e18:.2f}"
+        f"{want.symbol()} price from the spotter is {maker_dai_delegate.getSpotPrice(s.ilk())/1e18:.2f}"
     )
     print(f"Target collateralization ratio is {s.collateralizationRatio()/1e18:.2f}")
     print(f"Current CDP ratio is {s.getCurrentMakerVaultRatio()/1e18:.2f}")

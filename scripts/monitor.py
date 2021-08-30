@@ -14,7 +14,7 @@ def main():
 
 
 def print_monitoring_info_for_strategy(s):
-    output = []
+    output = ["```"]
 
     s = Contract(s)
     want = Contract(s.want())
@@ -54,11 +54,13 @@ def print_monitoring_info_for_strategy(s):
         )
     else:
         output.append(f"Everything looks OK")
+
+    output.append("```")
     return output
 
 
 def send_msg(text):
-    payload = {"chat_id": "-1001580241915", "text": text}
+    payload = {"chat_id": "-1001580241915", "text": text, "parse_mode": "MarkdownV2"}
     r = requests.get(
         "https://api.telegram.org/bot" + telegram_bot_key + "/sendMessage",
         params=payload,

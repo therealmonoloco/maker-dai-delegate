@@ -23,9 +23,9 @@ def print_monitoring_info_for_strategy(s):
     print(f"{shares/1e18:.2f} shares in yVault worth {value/1e18:.2f} Dai")
 
     if value >= debt:
-        print(f"Current profit is {(value - debt)/1e18} Dai")
+        print(f"Current profit is {(value - debt)/1e18:.2f} Dai")
     else:
-        print(f"Current loss is {(debt - value)/1e18} Dai")
+        print(f"Current loss is {(debt - value)/1e18:.2f} Dai")
 
     print(
         f"Current {want.symbol()} spot price is {maker_dai_delegate.getSpotPrice(s.ilk())/1e18:.2f}"

@@ -177,9 +177,15 @@ def gemJoinAdapter():
 
 
 @pytest.fixture
+def healthCheck():
+    yield Contract("0xDDCea799fF1699e98EDF118e0629A974Df7DF012")
+
+
+@pytest.fixture
 def strategy(vault, Strategy, gov, osmProxy, cloner):
     strategy = Strategy.at(cloner.original())
     strategy.setLeaveDebtBehind(False, {"from": gov})
+    strategy.setDoHealthCheck(True, {"from": gov})
 
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
@@ -213,6 +219,7 @@ def test_strategy(
         price_oracle_eth,
     )
     strategy.setLeaveDebtBehind(False, {"from": gov})
+    strategy.setDoHealthCheck(True, {"from": gov})
 
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 

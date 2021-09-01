@@ -153,6 +153,9 @@ contract Strategy is BaseStrategy {
         // Set default router to SushiSwap
         router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
+        // Set health check to health.ychad.eth
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;
+
         cdpId = MakerDaiDelegateLib.openCdp(ilk);
         require(cdpId > 0); // dev: error opening cdp
 

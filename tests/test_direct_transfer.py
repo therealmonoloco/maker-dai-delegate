@@ -1,4 +1,6 @@
-from brownie import chain, Wei
+import pytest
+
+from brownie import chain
 
 
 def test_direct_transfer_increments_estimated_total_assets(
@@ -10,23 +12,36 @@ def test_direct_transfer_increments_estimated_total_assets(
     assert strategy.estimatedTotalAssets() == initial + amount
 
 
-def test_direct_transfer_increments_profits(vault, strategy, token, token_whale, gov):
+def test_direct_transfer_increments_profits(
+    vault, strategy, token, token_whale, gov, RELATIVE_APPROX
+):
     initialProfit = vault.strategies(strategy).dict()["totalGain"]
     assert initialProfit == 0
 
-    amount = 10 * (10 ** token.decimals())
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(1000 * (10 ** token.decimals()), {"from": token_whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    amount = 5 * (10 ** token.decimals())
     token.transfer(strategy, amount, {"from": token_whale})
 
     chain.sleep(1)
     strategy.harvest({"from": gov})
-    assert vault.strategies(strategy).dict()["totalGain"] == initialProfit + amount
+    assert (
+        pytest.approx(
+            vault.strategies(strategy).dict()["totalGain"] / token.decimals(),
+            rel=RELATIVE_APPROX,
+        )
+        == (initialProfit + amount) / token.decimals()
+    )
 
 
 def test_borrow_token_transfer_sends_to_yvault(
     vault, strategy, token, token_whale, borrow_token, borrow_whale, gov
 ):
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(10 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(1000 * (10 ** token.decimals()), {"from": token_whale})
 
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -43,7 +58,7 @@ def test_borrow_token_transfer_increments_profits(
     vault, test_strategy, token, token_whale, borrow_token, borrow_whale, gov
 ):
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(10 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(1000 * (10 ** token.decimals()), {"from": token_whale})
 
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
@@ -70,7 +85,7 @@ def test_deposit_should_not_increment_profits(vault, strategy, token, token_whal
     assert initialProfit == 0
 
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(10 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(1000 * (10 ** token.decimals()), {"from": token_whale})
 
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -85,7 +100,7 @@ def test_direct_transfer_with_actual_profits(
     assert initialProfit == 0
 
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(10 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(10000 * (10 ** token.decimals()), {"from": token_whale})
 
     chain.sleep(1)
     strategy.harvest({"from": gov})

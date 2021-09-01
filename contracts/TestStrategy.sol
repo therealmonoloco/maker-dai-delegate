@@ -44,4 +44,8 @@ contract TestStrategy is Strategy {
     function _getCurrentMakerVaultRatio() public view returns (uint256) {
         return getCurrentMakerVaultRatio();
     }
+
+    function freeCollateral(uint256 collateralAmount) public {
+        return _freeCollateralAndRepayDai(collateralAmount, 0);
+    }
 }

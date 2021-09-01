@@ -162,13 +162,11 @@ def test_withdraw_everything_with_vault_in_debt_ceiling(
 def test_large_want_balance_does_not_generate_debt_over_ceiling(
     vault, test_strategy, token, token_whale, yvault, borrow_token, gov
 ):
-    token.transfer(test_strategy, Wei("250_000 ether"), {"from": token_whale})
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(Wei("250_000 ether"), {"from": token_whale})
 
-    # First harvest will move profits to the vault
-    chain.sleep(1)
-    test_strategy.harvest({"from": gov})
-
-    # Second harvest will send the funds through the strategy to invest
+    # Send the funds through the strategy to invest
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
@@ -191,13 +189,11 @@ def test_large_want_balance_does_not_generate_debt_over_ceiling(
 def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
     vault, test_strategy, token, token_whale, yvault, gov
 ):
-    token.transfer(test_strategy, Wei("250_000 ether"), {"from": token_whale})
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(Wei("250_000 ether"), {"from": token_whale})
 
-    # First harvest will move profits to the vault
-    chain.sleep(1)
-    test_strategy.harvest({"from": gov})
-
-    # Second harvest will send the funds through the strategy to invest
+    # Send the funds through the strategy to invest
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 

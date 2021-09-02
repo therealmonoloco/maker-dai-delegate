@@ -205,7 +205,7 @@ contract Strategy is BaseStrategy {
     }
 
     // Max slippage to accept when withdrawing from yVault
-    function setMaxLoss(uint256 _maxLoss) external onlyEmergencyAuthorized {
+    function setMaxLoss(uint256 _maxLoss) external onlyVaultManagers {
         maxLoss = _maxLoss;
     }
 

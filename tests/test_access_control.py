@@ -43,17 +43,17 @@ def test_set_max_loss_acl(strategy, gov, strategist, management, guardian, user)
     strategy.setMaxLoss(10, {"from": gov})
     assert strategy.maxLoss() == 10
 
-    strategy.setMaxLoss(11, {"from": strategist})
+    strategy.setMaxLoss(11, {"from": management})
     assert strategy.maxLoss() == 11
 
-    strategy.setMaxLoss(12, {"from": management})
-    assert strategy.maxLoss() == 12
-
-    strategy.setMaxLoss(13, {"from": guardian})
-    assert strategy.maxLoss() == 13
+    with reverts("!authorized"):
+        strategy.setMaxLoss(12, {"from": strategist})
 
     with reverts("!authorized"):
-        strategy.setMaxLoss(10, {"from": user})
+        strategy.setMaxLoss(13, {"from": guardian})
+
+    with reverts("!authorized"):
+        strategy.setMaxLoss(14, {"from": user})
 
 
 def test_set_leave_debt_behind_acl(

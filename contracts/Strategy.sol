@@ -221,12 +221,6 @@ contract Strategy is BaseStrategy {
         leaveDebtBehind = _leaveDebtBehind;
     }
 
-    // Where to route token swaps
-    // Access control is stricter in this method as it will be sent funds
-    function setSwapRouter(ISwap _router) external onlyGovernance {
-        router = _router;
-    }
-
     // Required to move funds to a new cdp and use a different cdpId after migration
     // Should only be called by governance as it will move funds
     function shiftToCdp(uint256 newCdpId) external onlyGovernance {

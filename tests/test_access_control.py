@@ -75,25 +75,6 @@ def test_set_leave_debt_behind_acl(
         strategy.setLeaveDebtBehind(True, {"from": user})
 
 
-def test_set_swap_router_acl(
-    strategy, router, gov, strategist, management, guardian, user
-):
-    strategy.setSwapRouter(router, {"from": gov})
-    assert strategy.router() == router
-
-    with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": strategist})
-
-    with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": management})
-
-    with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": guardian})
-
-    with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": user})
-
-
 def test_shift_cdp_acl(strategy, gov, strategist, management, guardian, user):
     # cdp-not-allowed should be the revert msg when allowed / we are shifting to a random cdp
     with reverts("cdp-not-allowed"):

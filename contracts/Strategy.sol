@@ -410,6 +410,7 @@ contract Strategy is BaseStrategy {
             _loss = _amountNeeded.sub(looseWant);
         } else {
             _liquidatedAmount = _amountNeeded;
+            _loss = 0;
         }
     }
 

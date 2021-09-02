@@ -110,7 +110,7 @@ contract Strategy is BaseStrategy {
         address _chainlinkWantToETHPriceFeed
     ) public {
         // Make sure we only initialize one time
-        require(ilk == 0); // dev: ilk already initialized
+        require(address(yVault) == address(0)); // dev: strategy already initialized
 
         address sender = msg.sender;
 

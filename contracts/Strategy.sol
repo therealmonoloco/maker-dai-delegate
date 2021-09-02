@@ -387,21 +387,7 @@ contract Strategy is BaseStrategy {
             balanceOfWant() < _amountNeeded &&
             balanceOfDebt() > 0
         ) {
-            uint256 currentInvestmentValue = _valueOfInvestment();
-
-            // Very small numbers may round to 0 'want' to use for buying investment token
-            // Enforce a minimum of $1 to swap in order to avoid this
-            uint256 investmentLeftToAcquire =
-                balanceOfDebt().sub(currentInvestmentValue);
-
-            uint256 investmentLeftToAcquireInWant =
-                _convertInvestmentTokenToWant(investmentLeftToAcquire);
-
-            if (investmentLeftToAcquireInWant <= balanceOfWant()) {
-                _buyInvestmentTokenWithWant(investmentLeftToAcquire);
-                _repayDebt(0);
-                _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
-            }
+            _sellCollateralToRepayRemainingDebtIfNeeded();
         }
 
         uint256 looseWant = balanceOfWant();
@@ -536,6 +522,24 @@ contract Strategy is BaseStrategy {
             _withdrawFromYVault(amountToRepay.sub(balanceIT));
         }
         _repayInvestmentTokenDebt(amountToRepay);
+    }
+
+    function _sellCollateralToRepayRemainingDebtIfNeeded() internal {
+        uint256 currentInvestmentValue = _valueOfInvestment();
+
+        // Very small numbers may round to 0 'want' to use for buying investment token
+        // Enforce a minimum of $1 to swap in order to avoid this
+        uint256 investmentLeftToAcquire =
+            balanceOfDebt().sub(currentInvestmentValue);
+
+        uint256 investmentLeftToAcquireInWant =
+            _convertInvestmentTokenToWant(investmentLeftToAcquire);
+
+        if (investmentLeftToAcquireInWant <= balanceOfWant()) {
+            _buyInvestmentTokenWithWant(investmentLeftToAcquire);
+            _repayDebt(0);
+            _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
+        }
     }
 
     // Mint the maximum DAI possible for the locked collateral

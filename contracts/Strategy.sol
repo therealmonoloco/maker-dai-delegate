@@ -162,7 +162,7 @@ contract Strategy is BaseStrategy {
         );
 
         // Set default router to SushiSwap
-        router = uniswapRouter;
+        router = sushiswapRouter;
 
         // Set health check to health.ychad.eth
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;

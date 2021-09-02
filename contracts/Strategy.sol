@@ -383,9 +383,9 @@ contract Strategy is BaseStrategy {
 
         // If we still need more want to repay, we may need to unlock some collateral to sell
         if (
+            !leaveDebtBehind &&
             balanceOfWant() < _amountNeeded &&
-            balanceOfDebt() > 0 &&
-            !leaveDebtBehind
+            balanceOfDebt() > 0
         ) {
             uint256 currentInvestmentValue = _valueOfInvestment();
 

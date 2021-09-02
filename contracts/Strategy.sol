@@ -40,6 +40,14 @@ contract Strategy is BaseStrategy {
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
+    // SushiSwap router
+    ISwap internal constant sushiswapRouter =
+        ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+
+    // Uniswap router
+    ISwap internal constant uniswapRouter =
+        ISwap(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+
     // Token Adapter Module for collateral
     address public gemJoinAdapter;
 
@@ -55,7 +63,7 @@ contract Strategy is BaseStrategy {
     // DAI yVault
     IVault public yVault;
 
-    // SushiSwap router
+    // Router used for swaps
     ISwap public router;
 
     // Collateral type
@@ -154,7 +162,7 @@ contract Strategy is BaseStrategy {
         );
 
         // Set default router to SushiSwap
-        router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+        router = uniswapRouter;
 
         // Set health check to health.ychad.eth
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;
@@ -246,6 +254,15 @@ contract Strategy is BaseStrategy {
         onlyGovernance
     {
         MakerDaiDelegateLib.allowManagingCdp(cdpId, user, allow);
+    }
+
+    // Allow switching between Uniswap and SushiSwap
+    function switchDex(bool isUniswap) external onlyVaultManagers {
+        if (isUniswap) {
+            router = uniswapRouter;
+        } else {
+            router = sushiswapRouter;
+        }
     }
 
     // ******** OVERRIDEN METHODS FROM BASE CONTRACT ************

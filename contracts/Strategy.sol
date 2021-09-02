@@ -731,7 +731,7 @@ contract Strategy is BaseStrategy {
 
         // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
         uint256 chainLinkPrice =
-            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()) * 1e10;
+            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()).mul(1e10);
 
         // Return the worst price available in [wad]
         // par is crucial to this calculation as it defines the relationship between DAI and

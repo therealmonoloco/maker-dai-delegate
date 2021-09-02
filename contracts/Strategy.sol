@@ -34,6 +34,9 @@ contract Strategy is BaseStrategy {
     // 100%
     uint256 internal constant MAX_BPS = WAD;
 
+    // Maximum loss on withdrawal from yVault
+    uint256 internal constant MAX_LOSS_BPS = 10000;
+
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
@@ -206,6 +209,7 @@ contract Strategy is BaseStrategy {
 
     // Max slippage to accept when withdrawing from yVault
     function setMaxLoss(uint256 _maxLoss) external onlyVaultManagers {
+        require(_maxLoss <= MAX_LOSS_BPS); // dev: invalid value for max loss
         maxLoss = _maxLoss;
     }
 

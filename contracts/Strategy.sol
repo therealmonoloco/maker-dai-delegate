@@ -538,8 +538,6 @@ contract Strategy is BaseStrategy {
     function _sellCollateralToRepayRemainingDebtIfNeeded() internal {
         uint256 currentInvestmentValue = _valueOfInvestment();
 
-        // Very small numbers may round to 0 'want' to use for buying investment token
-        // Enforce a minimum of $1 to swap in order to avoid this
         uint256 investmentLeftToAcquire =
             balanceOfDebt().sub(currentInvestmentValue);
 

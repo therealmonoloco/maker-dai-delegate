@@ -16,9 +16,9 @@ def test_lower_target_ratio_should_take_more_debt(
     # Shares in yVault at the current target ratio
     shares_before = yvault.balanceOf(strategy)
 
-    new_ratio_relative = 0.8
+    new_ratio_relative = 0.9
 
-    # In default settings this will be 250 * 0.8 = 200
+    # In default settings this will be 225 * 0.9 = 202.5
     strategy.setCollateralizationRatio(
         strategy.collateralizationRatio() * new_ratio_relative, {"from": gov}
     )
@@ -74,7 +74,7 @@ def test_higher_target_ratio_should_repay_debt(
 
     new_ratio_relative = 1.2
 
-    # In default settings this will be 250 * 1.2 = 300
+    # In default settings this will be 225 * 1.2 = 270
     strategy.setCollateralizationRatio(
         strategy.collateralizationRatio() * new_ratio_relative, {"from": gov}
     )

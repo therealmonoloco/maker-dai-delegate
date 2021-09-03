@@ -171,12 +171,12 @@ contract Strategy is BaseStrategy {
         require(cdpId > 0); // dev: error opening cdp
 
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
-        // Allow additional 5% in any direction (245, 255) by default
-        rebalanceTolerance = (5 * MAX_BPS) / 100;
+        // Allow additional 15% in any direction (210, 240) by default
+        rebalanceTolerance = (15 * MAX_BPS) / 100;
 
         // Minimum collaterization ratio on YFI-A is 175%
-        // Use 250% as target
-        collateralizationRatio = (250 * MAX_BPS) / 100;
+        // Use 225% as target
+        collateralizationRatio = (225 * MAX_BPS) / 100;
 
         // If we lose money in yvDAI then we are not OK selling want to repay it
         leaveDebtBehind = true;

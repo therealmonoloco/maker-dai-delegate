@@ -34,8 +34,19 @@ contract Strategy is BaseStrategy {
     // 100%
     uint256 internal constant MAX_BPS = WAD;
 
+    // Maximum loss on withdrawal from yVault
+    uint256 internal constant MAX_LOSS_BPS = 10000;
+
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+    // SushiSwap router
+    ISwap internal constant sushiswapRouter =
+        ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+
+    // Uniswap router
+    ISwap internal constant uniswapRouter =
+        ISwap(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     // Token Adapter Module for collateral
     address public gemJoinAdapter;
@@ -52,7 +63,7 @@ contract Strategy is BaseStrategy {
     // DAI yVault
     IVault public yVault;
 
-    // SushiSwap router
+    // Router used for swaps
     ISwap public router;
 
     // Collateral type
@@ -110,7 +121,7 @@ contract Strategy is BaseStrategy {
         address _chainlinkWantToETHPriceFeed
     ) public {
         // Make sure we only initialize one time
-        require(ilk == 0); // dev: ilk already initialized
+        require(address(yVault) == address(0)); // dev: strategy already initialized
 
         address sender = msg.sender;
 
@@ -151,7 +162,10 @@ contract Strategy is BaseStrategy {
         );
 
         // Set default router to SushiSwap
-        router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+        router = sushiswapRouter;
+
+        // Set health check to health.ychad.eth
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;
 
         cdpId = MakerDaiDelegateLib.openCdp(ilk);
         require(cdpId > 0); // dev: error opening cdp
@@ -202,7 +216,8 @@ contract Strategy is BaseStrategy {
     }
 
     // Max slippage to accept when withdrawing from yVault
-    function setMaxLoss(uint256 _maxLoss) external onlyEmergencyAuthorized {
+    function setMaxLoss(uint256 _maxLoss) external onlyVaultManagers {
+        require(_maxLoss <= MAX_LOSS_BPS); // dev: invalid value for max loss
         maxLoss = _maxLoss;
     }
 
@@ -212,12 +227,6 @@ contract Strategy is BaseStrategy {
         onlyEmergencyAuthorized
     {
         leaveDebtBehind = _leaveDebtBehind;
-    }
-
-    // Where to route token swaps
-    // Access control is stricter in this method as it will be sent funds
-    function setSwapRouter(ISwap _router) external onlyGovernance {
-        router = _router;
     }
 
     // Required to move funds to a new cdp and use a different cdpId after migration
@@ -245,6 +254,15 @@ contract Strategy is BaseStrategy {
         onlyGovernance
     {
         MakerDaiDelegateLib.allowManagingCdp(cdpId, user, allow);
+    }
+
+    // Allow switching between Uniswap and SushiSwap
+    function switchDex(bool isUniswap) external onlyVaultManagers {
+        if (isUniswap) {
+            router = uniswapRouter;
+        } else {
+            router = sushiswapRouter;
+        }
     }
 
     // ******** OVERRIDEN METHODS FROM BASE CONTRACT ************
@@ -376,25 +394,11 @@ contract Strategy is BaseStrategy {
 
         // If we still need more want to repay, we may need to unlock some collateral to sell
         if (
+            !leaveDebtBehind &&
             balanceOfWant() < _amountNeeded &&
-            balanceOfDebt() > 0 &&
-            !leaveDebtBehind
+            balanceOfDebt() > 0
         ) {
-            uint256 currentInvestmentValue = _valueOfInvestment();
-
-            // Very small numbers may round to 0 'want' to use for buying investment token
-            // Enforce a minimum of $1 to swap in order to avoid this
-            uint256 investmentLeftToAcquire =
-                balanceOfDebt().sub(currentInvestmentValue);
-
-            uint256 investmentLeftToAcquireInWant =
-                _convertInvestmentTokenToWant(investmentLeftToAcquire);
-
-            if (investmentLeftToAcquireInWant <= balanceOfWant()) {
-                _buyInvestmentTokenWithWant(investmentLeftToAcquire);
-                _repayDebt(0);
-                _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
-            }
+            _sellCollateralToRepayRemainingDebtIfNeeded();
         }
 
         uint256 looseWant = balanceOfWant();
@@ -403,6 +407,7 @@ contract Strategy is BaseStrategy {
             _loss = _amountNeeded.sub(looseWant);
         } else {
             _liquidatedAmount = _amountNeeded;
+            _loss = 0;
         }
     }
 
@@ -528,6 +533,24 @@ contract Strategy is BaseStrategy {
             _withdrawFromYVault(amountToRepay.sub(balanceIT));
         }
         _repayInvestmentTokenDebt(amountToRepay);
+    }
+
+    function _sellCollateralToRepayRemainingDebtIfNeeded() internal {
+        uint256 currentInvestmentValue = _valueOfInvestment();
+
+        // Very small numbers may round to 0 'want' to use for buying investment token
+        // Enforce a minimum of $1 to swap in order to avoid this
+        uint256 investmentLeftToAcquire =
+            balanceOfDebt().sub(currentInvestmentValue);
+
+        uint256 investmentLeftToAcquireInWant =
+            _convertInvestmentTokenToWant(investmentLeftToAcquire);
+
+        if (investmentLeftToAcquireInWant <= balanceOfWant()) {
+            _buyInvestmentTokenWithWant(investmentLeftToAcquire);
+            _repayDebt(0);
+            _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
+        }
     }
 
     // Mint the maximum DAI possible for the locked collateral
@@ -728,7 +751,7 @@ contract Strategy is BaseStrategy {
 
         // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
         uint256 chainLinkPrice =
-            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()) * 1e10;
+            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()).mul(1e10);
 
         // Return the worst price available in [wad]
         // par is crucial to this calculation as it defines the relationship between DAI and

@@ -126,6 +126,7 @@ def test_clone_of_clone(strategy, cloner, yvault, strategist, token, osmProxy):
     yVaultUNI = Contract("0xFBEB78a723b8087fD2ea7Ef1afEc93d35E8Bed42")
     chainlinkUNIToUSD = Contract("0x553303d460EE0afB37EdFf9bE42922D8FF63220e")
     chainlinkUNIToETH = Contract("0xD6aA3D25116d8dA79Ea0246c4826EB951872e02e")
+    sushiswap = Contract("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
 
     clone_tx = cloner.cloneMakerDaiDelegate(
         yVaultUNI,
@@ -145,6 +146,7 @@ def test_clone_of_clone(strategy, cloner, yvault, strategist, token, osmProxy):
         "Strategy", clone_tx.events["Cloned"]["clone"], strategy.abi
     )
 
+    assert cloned_strategy.router() == sushiswap
     assert cloned_strategy.yVault() == yvault
     assert cloned_strategy.name() == "StrategyMakerUNI"
     assert (

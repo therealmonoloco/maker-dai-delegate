@@ -195,14 +195,10 @@ def test_tend_trigger_conditions(
     )
     assert strategy.tendTrigger(1) == False
 
-    # Whale deposit so there is no more DAI available to mint should return false
-    token.transfer(strategy, Wei("500 ether"), {"from": token_whale})
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(Wei("100_000 ether"), {"from": token_whale})
 
-    # First harvest will move profits to the vault
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-
-    # Second harvest will send the funds through the strategy to invest
+    # Send the funds through the strategy to invest
     chain.sleep(1)
     strategy.harvest({"from": gov})
 

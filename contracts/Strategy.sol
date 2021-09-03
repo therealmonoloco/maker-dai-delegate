@@ -15,6 +15,7 @@ import "./libraries/MakerDaiDelegateLib.sol";
 
 import "../interfaces/chainlink/AggregatorInterface.sol";
 import "../interfaces/swap/ISwap.sol";
+import "../interfaces/yearn/IOSMedianizer.sol";
 import "../interfaces/yearn/IVault.sol";
 
 contract Strategy is BaseStrategy {
@@ -33,14 +34,25 @@ contract Strategy is BaseStrategy {
     // 100%
     uint256 internal constant MAX_BPS = WAD;
 
+    // Maximum loss on withdrawal from yVault
+    uint256 internal constant MAX_LOSS_BPS = 10000;
+
     // Wrapped Ether - Used for swaps routing
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+    // SushiSwap router
+    ISwap internal constant sushiswapRouter =
+        ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+
+    // Uniswap router
+    ISwap internal constant uniswapRouter =
+        ISwap(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     // Token Adapter Module for collateral
     address public gemJoinAdapter;
 
     // Maker Oracle Security Module
-    OracleSecurityModule public wantToUSDOSMProxy;
+    IOSMedianizer public wantToUSDOSMProxy;
 
     // Use Chainlink oracle to obtain latest want/ETH price
     AggregatorInterface public chainlinkWantToETHPriceFeed;
@@ -51,7 +63,7 @@ contract Strategy is BaseStrategy {
     // DAI yVault
     IVault public yVault;
 
-    // SushiSwap router
+    // Router used for swaps
     ISwap public router;
 
     // Collateral type
@@ -109,7 +121,7 @@ contract Strategy is BaseStrategy {
         address _chainlinkWantToETHPriceFeed
     ) public {
         // Make sure we only initialize one time
-        require(ilk == 0); // dev: ilk already initialized
+        require(address(yVault) == address(0)); // dev: strategy already initialized
 
         address sender = msg.sender;
 
@@ -141,7 +153,7 @@ contract Strategy is BaseStrategy {
         strategyName = _strategyName;
         ilk = _ilk;
         gemJoinAdapter = _gemJoin;
-        wantToUSDOSMProxy = OracleSecurityModule(_wantToUSDOSMProxy);
+        wantToUSDOSMProxy = IOSMedianizer(_wantToUSDOSMProxy);
         chainlinkWantToUSDPriceFeed = AggregatorInterface(
             _chainlinkWantToUSDPriceFeed
         );
@@ -150,18 +162,21 @@ contract Strategy is BaseStrategy {
         );
 
         // Set default router to SushiSwap
-        router = ISwap(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+        router = sushiswapRouter;
+
+        // Set health check to health.ychad.eth
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;
 
         cdpId = MakerDaiDelegateLib.openCdp(ilk);
         require(cdpId > 0); // dev: error opening cdp
 
         // Current ratio can drift (collateralizationRatio - rebalanceTolerance, collateralizationRatio + rebalanceTolerance)
-        // Allow additional 5% in any direction (245, 255) by default
-        rebalanceTolerance = (5 * MAX_BPS) / 100;
+        // Allow additional 15% in any direction (210, 240) by default
+        rebalanceTolerance = (15 * MAX_BPS) / 100;
 
         // Minimum collaterization ratio on YFI-A is 175%
-        // Use 250% as target
-        collateralizationRatio = (250 * MAX_BPS) / 100;
+        // Use 225% as target
+        collateralizationRatio = (225 * MAX_BPS) / 100;
 
         // If we lose money in yvDAI then we are not OK selling want to repay it
         leaveDebtBehind = true;
@@ -201,7 +216,8 @@ contract Strategy is BaseStrategy {
     }
 
     // Max slippage to accept when withdrawing from yVault
-    function setMaxLoss(uint256 _maxLoss) external onlyEmergencyAuthorized {
+    function setMaxLoss(uint256 _maxLoss) external onlyVaultManagers {
+        require(_maxLoss <= MAX_LOSS_BPS); // dev: invalid value for max loss
         maxLoss = _maxLoss;
     }
 
@@ -211,12 +227,6 @@ contract Strategy is BaseStrategy {
         onlyEmergencyAuthorized
     {
         leaveDebtBehind = _leaveDebtBehind;
-    }
-
-    // Where to route token swaps
-    // Access control is stricter in this method as it will be sent funds
-    function setSwapRouter(ISwap _router) external onlyGovernance {
-        router = _router;
     }
 
     // Required to move funds to a new cdp and use a different cdpId after migration
@@ -244,6 +254,15 @@ contract Strategy is BaseStrategy {
         onlyGovernance
     {
         MakerDaiDelegateLib.allowManagingCdp(cdpId, user, allow);
+    }
+
+    // Allow switching between Uniswap and SushiSwap
+    function switchDex(bool isUniswap) external onlyVaultManagers {
+        if (isUniswap) {
+            router = uniswapRouter;
+        } else {
+            router = sushiswapRouter;
+        }
     }
 
     // ******** OVERRIDEN METHODS FROM BASE CONTRACT ************
@@ -373,28 +392,13 @@ contract Strategy is BaseStrategy {
         amountToFree = Math.min(amountToFree, _maxWithdrawal());
         _freeCollateralAndRepayDai(amountToFree, 0);
 
-        // If we are liquidating all positions and were not able to pay the debt in full,
-        // we may need to unlock some collateral to sell
+        // If we still need more want to repay, we may need to unlock some collateral to sell
         if (
-            _amountNeeded > amountToFree &&
-            balanceOfDebt() > 0 &&
-            !leaveDebtBehind
+            !leaveDebtBehind &&
+            balanceOfWant() < _amountNeeded &&
+            balanceOfDebt() > 0
         ) {
-            uint256 currentInvestmentValue = _valueOfInvestment();
-
-            // Very small numbers may round to 0 'want' to use for buying investment token
-            // Enforce a minimum of $1 to swap in order to avoid this
-            uint256 investmentLeftToAcquire =
-                balanceOfDebt().add(WAD).sub(currentInvestmentValue);
-
-            uint256 investmentLeftToAcquireInWant =
-                _convertInvestmentTokenToWant(investmentLeftToAcquire);
-
-            if (investmentLeftToAcquireInWant <= balanceOfWant()) {
-                _buyInvestmentTokenWithWant(investmentLeftToAcquire);
-                _repayDebt(0);
-                _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
-            }
+            _sellCollateralToRepayRemainingDebtIfNeeded();
         }
 
         uint256 looseWant = balanceOfWant();
@@ -403,6 +407,7 @@ contract Strategy is BaseStrategy {
             _loss = _amountNeeded.sub(looseWant);
         } else {
             _liquidatedAmount = _amountNeeded;
+            _loss = 0;
         }
     }
 
@@ -470,7 +475,10 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256)
     {
-        // YFI price in ETH with 18 decimals
+        if (address(want) == address(WETH)) {
+            return _amtInWei;
+        }
+
         uint256 price = uint256(chainlinkWantToETHPriceFeed.latestAnswer());
         return _amtInWei.mul(WAD).div(price);
     }
@@ -525,6 +533,22 @@ contract Strategy is BaseStrategy {
             _withdrawFromYVault(amountToRepay.sub(balanceIT));
         }
         _repayInvestmentTokenDebt(amountToRepay);
+    }
+
+    function _sellCollateralToRepayRemainingDebtIfNeeded() internal {
+        uint256 currentInvestmentValue = _valueOfInvestment();
+
+        uint256 investmentLeftToAcquire =
+            balanceOfDebt().sub(currentInvestmentValue);
+
+        uint256 investmentLeftToAcquireInWant =
+            _convertInvestmentTokenToWant(investmentLeftToAcquire);
+
+        if (investmentLeftToAcquireInWant <= balanceOfWant()) {
+            _buyInvestmentTokenWithWant(investmentLeftToAcquire);
+            _repayDebt(0);
+            _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
+        }
     }
 
     // Mint the maximum DAI possible for the locked collateral
@@ -682,39 +706,50 @@ contract Strategy is BaseStrategy {
         return totalCollateral.sub(minCollateral);
     }
 
-    // ----------------- INTERNAL CALCS -----------------
+    // ----------------- PUBLIC BALANCES -----------------
 
-    function balanceOfWant() internal view returns (uint256) {
+    function balanceOfWant() public view returns (uint256) {
         return want.balanceOf(address(this));
     }
 
-    function balanceOfInvestmentToken() internal view returns (uint256) {
+    function balanceOfInvestmentToken() public view returns (uint256) {
         return investmentToken.balanceOf(address(this));
     }
 
-    function balanceOfDebt() internal view returns (uint256) {
+    function balanceOfDebt() public view returns (uint256) {
         return MakerDaiDelegateLib.debtForCdp(cdpId, ilk);
     }
 
     // Returns collateral balance in the vault
-    function balanceOfMakerVault() internal view returns (uint256) {
+    function balanceOfMakerVault() public view returns (uint256) {
         return MakerDaiDelegateLib.balanceOfCdp(cdpId, ilk);
     }
+
+    // Effective collateralization ratio of the vault
+    function getCurrentMakerVaultRatio() public view returns (uint256) {
+        return
+            MakerDaiDelegateLib.getPessimisticRatioOfCdpWithExternalPrice(
+                cdpId,
+                ilk,
+                _getWantTokenPrice(),
+                MAX_BPS
+            );
+    }
+
+    // ----------------- INTERNAL CALCS -----------------
 
     function _getWantTokenPrice() internal view returns (uint256) {
         uint256 minPrice;
 
         // Assume we are white-listed in the OSM
-        (uint256 current, bool isCurrentValid) = wantToUSDOSMProxy.peek();
-        (uint256 future, bool isFutureValid) = wantToUSDOSMProxy.peep();
+        (uint256 current, ) = wantToUSDOSMProxy.read();
+        (uint256 future, ) = wantToUSDOSMProxy.foresight();
 
-        if (isCurrentValid && isFutureValid) {
-            minPrice = Math.min(future, current);
-        }
+        minPrice = Math.min(future, current);
 
         // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
         uint256 chainLinkPrice =
-            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()) * 1e10;
+            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()).mul(1e10);
 
         // Return the worst price available in [wad]
         // par is crucial to this calculation as it defines the relationship between DAI and
@@ -727,16 +762,6 @@ contract Strategy is BaseStrategy {
         // dealing with an invalid price or Maker Protocol Emergency Shutdown
         require(minPrice > 0); // dev: invalid price returned from oracle
         return minPrice;
-    }
-
-    function getCurrentMakerVaultRatio() internal view returns (uint256) {
-        return
-            MakerDaiDelegateLib.getPessimisticRatioOfCdpWithExternalPrice(
-                cdpId,
-                ilk,
-                _getWantTokenPrice(),
-                MAX_BPS
-            );
     }
 
     function _valueOfInvestment() internal view returns (uint256) {
@@ -789,7 +814,7 @@ contract Strategy is BaseStrategy {
         return amount.mul(WAD).div(_getWantTokenPrice());
     }
 
-    function getTokenOutPath(address _token_in, address _token_out)
+    function _getTokenOutPath(address _token_in, address _token_out)
         internal
         pure
         returns (address[] memory _path)
@@ -820,7 +845,7 @@ contract Strategy is BaseStrategy {
         router.swapExactTokensForTokens(
             _amount,
             0,
-            getTokenOutPath(tokenA, tokenB),
+            _getTokenOutPath(tokenA, tokenB),
             address(this),
             now
         );
@@ -835,7 +860,7 @@ contract Strategy is BaseStrategy {
         router.swapTokensForExactTokens(
             _amount,
             type(uint256).max,
-            getTokenOutPath(address(want), address(investmentToken)),
+            _getTokenOutPath(address(want), address(investmentToken)),
             address(this),
             now
         );

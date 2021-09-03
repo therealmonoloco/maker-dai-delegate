@@ -82,7 +82,9 @@ library MakerDaiDelegateLib {
         }
 
         // Takes token amount from the strategy and joins into the vat
-        GemJoinLike(gemJoin).join(urn, collateralAmount);
+        if (collateralAmount > 0) {
+            GemJoinLike(gemJoin).join(urn, collateralAmount);
+        }
 
         // Locks token amount into the CDP and generates debt
         manager.frob(
@@ -112,7 +114,10 @@ library MakerDaiDelegateLib {
         address urn = manager.urns(cdpId);
 
         // Joins DAI amount into the vat
-        daiJoin.join(urn, daiToRepay);
+        if (daiToRepay > 0) {
+            daiJoin.join(urn, daiToRepay);
+        }
+
         uint256 wadC = convertTo18(gemJoin, collateralAmount);
 
         // Paybacks debt to the CDP and unlocks token amount from it

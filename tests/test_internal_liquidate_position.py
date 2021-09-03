@@ -109,7 +109,7 @@ def test_liquidate_position_without_enough_profit_but_leaving_debt_behind(
     # of collateral unless we pay the full debt.
     # Here we are leaving it behind, so it's a 25k "loss" priced in want
     min_locked_collateral_for_debt_floor = (
-        Wei("10_000 ether")
+        Wei("5_000 ether")
         / token_price
         * (
             test_strategy.collateralizationRatio() - test_strategy.rebalanceTolerance()

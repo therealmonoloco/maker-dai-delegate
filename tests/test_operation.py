@@ -71,7 +71,7 @@ def test_profitable_harvest(
 
     # Simulate profit in yVault
     before_pps = vault.pricePerShare()
-    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.05, {"from": dai_whale})
+    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.02, {"from": dai_whale})
 
     # Harvest 2: Realize profit
     strategy.harvest({"from": gov})
@@ -130,12 +130,13 @@ def test_sweep(
         # yvDai is protected
         strategy.sweep(yvDAI, {"from": gov})
 
-    before_balance = weth.balanceOf(gov)
-    weth.transfer(strategy, weth_amount, {"from": user})
-    assert weth.address != strategy.want()
-    assert weth.balanceOf(user) == 0
-    strategy.sweep(weth, {"from": gov})
-    assert weth.balanceOf(gov) == weth_amount + before_balance
+    # COMMENTING THIS FOR WETH
+    # before_balance = weth.balanceOf(gov)
+    # weth.transfer(strategy, weth_amount, {"from": user})
+    # assert weth.address != strategy.want()
+    # assert weth.balanceOf(user) == 0
+    # strategy.sweep(weth, {"from": gov})
+    # assert weth.balanceOf(gov) == weth_amount + before_balance
 
 
 def test_triggers(chain, gov, vault, strategy, token, amount, user):

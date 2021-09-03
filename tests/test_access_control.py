@@ -43,17 +43,17 @@ def test_set_max_loss_acl(strategy, gov, strategist, management, guardian, user)
     strategy.setMaxLoss(10, {"from": gov})
     assert strategy.maxLoss() == 10
 
-    strategy.setMaxLoss(11, {"from": strategist})
+    strategy.setMaxLoss(11, {"from": management})
     assert strategy.maxLoss() == 11
 
-    strategy.setMaxLoss(12, {"from": management})
-    assert strategy.maxLoss() == 12
-
-    strategy.setMaxLoss(13, {"from": guardian})
-    assert strategy.maxLoss() == 13
+    with reverts("!authorized"):
+        strategy.setMaxLoss(12, {"from": strategist})
 
     with reverts("!authorized"):
-        strategy.setMaxLoss(10, {"from": user})
+        strategy.setMaxLoss(13, {"from": guardian})
+
+    with reverts("!authorized"):
+        strategy.setMaxLoss(14, {"from": user})
 
 
 def test_set_leave_debt_behind_acl(
@@ -75,23 +75,30 @@ def test_set_leave_debt_behind_acl(
         strategy.setLeaveDebtBehind(True, {"from": user})
 
 
-def test_set_swap_router_acl(
-    strategy, router, gov, strategist, management, guardian, user
-):
-    strategy.setSwapRouter(router, {"from": gov})
-    assert strategy.router() == router
+def test_switch_dex_acl(strategy, gov, strategist, management, guardian, user):
+    uniswap = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
+    sushiswap = "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
 
     with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": strategist})
+        strategy.switchDex(True, {"from": user})
 
     with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": management})
+        strategy.switchDex(True, {"from": guardian})
 
     with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": guardian})
+        strategy.switchDex(True, {"from": strategist})
 
-    with reverts("!authorized"):
-        strategy.setSwapRouter(router, {"from": user})
+    strategy.switchDex(True, {"from": management})
+    assert strategy.router() == uniswap
+
+    strategy.switchDex(False, {"from": management})
+    assert strategy.router() == sushiswap
+
+    strategy.switchDex(True, {"from": gov})
+    assert strategy.router() == uniswap
+
+    strategy.switchDex(False, {"from": gov})
+    assert strategy.router() == sushiswap
 
 
 def test_shift_cdp_acl(strategy, gov, strategist, management, guardian, user):

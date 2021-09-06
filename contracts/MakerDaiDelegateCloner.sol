@@ -35,9 +35,15 @@ contract MakerDaiDelegateCloner {
 
         original = address(_original);
 
-        Strategy(_original).setRewards(msg.sender);
-        Strategy(_original).setKeeper(msg.sender);
-        Strategy(_original).setStrategist(msg.sender);
+        Strategy(_original).setRewards(
+            0xc491599b9A20c3A2F0A85697Ee6D9434EFa9f503
+        );
+        Strategy(_original).setKeeper(
+            0x736D7e3c5a6CB2CE3B764300140ABF476F6CFCCF
+        );
+        Strategy(_original).setStrategist(
+            0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7
+        );
     }
 
     function cloneMakerDaiDelegate(

@@ -8,7 +8,7 @@ telegram_bot_key = os.getenv("TELEGRAM_BOT_KEY")
 
 def main():
     output = print_monitoring_info_for_strategy(
-        "0x1aa390681036bfB47f407F26583c50ff8740A7d6"
+        "0xd33535e9F2E09485aC9cE8b27F865251161065E0"
     )
     send_msg("\n".join(output))
 
@@ -21,36 +21,35 @@ def print_monitoring_info_for_strategy(s):
     yvault = Contract(s.yVault())
     maker_dai_delegate = Contract("0xf728c1645739b1d4367A94232d7473016Df908E7")
 
-    output.append(f"{s.name()} deployed at {s} is using CDP {s.cdpId()}")
+    output.append(f"{s.name()} {s}")
 
     shares = yvault.balanceOf(s)
     value = shares * yvault.pricePerShare() / 1e18
     debt = s.balanceOfDebt()
 
     output.append(
-        f"Balance of CDP is {s.balanceOfMakerVault()/1e18:.2f} {want.symbol()} and we owe {debt/1e18:.2f} Dai"
+        f"Balance of CDP #{s.cdpId()}: {s.balanceOfMakerVault()/1e18:.2f} {want.symbol()}"
     )
-    output.append(f"{shares/1e18:.2f} shares in yVault worth {value/1e18:.2f} Dai")
+    output.append(f"Debt: {debt/1e18:.2f} DAI")
+    output.append(f"Value of investment: {value/1e18:.2f} DAI")
 
     if value >= debt:
-        output.append(f"Current profit is {(value - debt)/1e18:.2f} Dai")
+        output.append(f"Current profit: {(value - debt)/1e18:.2f} DAI")
     else:
-        output.append(f"Current loss is {(debt - value)/1e18:.2f} Dai")
+        output.append(f"Current loss: {(debt - value)/1e18:.2f} DAI")
 
     output.append(
-        f"{want.symbol()} price from the spotter is {maker_dai_delegate.getSpotPrice(s.ilk())/1e18:.2f}"
+        f"{want.symbol()} price (spotter): {maker_dai_delegate.getSpotPrice(s.ilk())/1e18:.2f}"
     )
+    output.append(f"Target c-ratio: {s.collateralizationRatio()/1e18:.2f}")
+    output.append(f"Current c-ratio: {s.getCurrentMakerVaultRatio()/1e18:.2f}")
     output.append(
-        f"Target collateralization ratio is {s.collateralizationRatio()/1e18:.2f}"
-    )
-    output.append(f"Current CDP ratio is {s.getCurrentMakerVaultRatio()/1e18:.2f}")
-    output.append(
-        f"Liquidation ratio is {maker_dai_delegate.getLiquidationRatio(s.ilk())/1e27:.2f}"
+        f"Liquidation ratio: {maker_dai_delegate.getLiquidationRatio(s.ilk())/1e27:.2f}"
     )
 
     if s.tendTrigger(1):
         output.append(
-            f"*Strategy is outside the tolerance band and should be rebalanced. Call tend()!*"
+            f"Strategy is outside the tolerance band and should be rebalanced. Call tend()!"
         )
     else:
         output.append(f"Everything looks OK")

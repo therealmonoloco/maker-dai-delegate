@@ -48,7 +48,7 @@ def test_prod(
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
 
     weth.approve(vault, 2 ** 256 - 1, {"from": weth_whale})
-    vault.deposit(5 * (10 ** weth.decimals()), {"from": weth_whale})
+    vault.deposit(2 * (10 ** weth.decimals()), {"from": weth_whale})
 
     strategy.harvest({"from": gov})
     assert yvault.balanceOf(strategy) > 0

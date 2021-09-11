@@ -39,7 +39,7 @@ def management(accounts):
 
 @pytest.fixture
 def strategist(accounts):
-    yield accounts[4]
+    yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
 
 
 @pytest.fixture
@@ -49,15 +49,15 @@ def keeper(accounts):
 
 @pytest.fixture
 def token():
-    token_address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"  # WETH
+    token_address = "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e"  # YFI
     yield Contract(token_address)
 
 
 @pytest.fixture
 def token_whale(accounts):
     yield accounts.at(
-        "0x030bA81f1c18d280636F32af80b9AAd02Cf0854e", force=True
-    )  # AAVE aWETH
+        "0x5165d24277cD063F5ac44Efd447B27025e888f37", force=True
+    )  # AAVE aYFI
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ def yvault(yvDAI):
 @pytest.fixture
 def price_oracle_usd():
     chainlink_oracle = interface.AggregatorInterface(
-        "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+        "0xA027702dbb89fbd58938e4324ac03B58d812b0E1"
     )
     yield chainlink_oracle
 
@@ -164,15 +164,20 @@ def new_dai_yvault(pm, gov, rewards, guardian, management, dai):
 
 
 @pytest.fixture
-def osmProxy():
+def osmProxy(gov, YFIOSMAdapter):
+    yield YFIOSMAdapter.deploy({"from": gov})
+
+
+@pytest.fixture
+def whitelistedOSM():
     # Allow the strategy to query the OSM proxy
-    osm = Contract("0xCF63089A8aD2a9D8BD6Bb8022f3190EB7e1eD0f1")
+    osm = Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
     yield osm
 
 
 @pytest.fixture
 def gemJoinAdapter():
-    gemJoin = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E")  # ETH-C
+    gemJoin = Contract("0x3ff33d9162aD47660083D7DC4bC02Fb231c81677")  # YFI-A
     yield gemJoin
 
 
@@ -182,7 +187,7 @@ def healthCheck():
 
 
 @pytest.fixture
-def strategy(vault, Strategy, gov, osmProxy, cloner):
+def strategy(vault, Strategy, gov, osmProxy, whitelistedOSM, cloner):
     strategy = Strategy.at(cloner.original())
     strategy.setLeaveDebtBehind(False, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
@@ -190,7 +195,9 @@ def strategy(vault, Strategy, gov, osmProxy, cloner):
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # Allow the strategy to query the OSM proxy
+    whitelistedOSM.set_user(osmProxy, True, {"from": gov})
     osmProxy.setAuthorized(strategy, {"from": gov})
+
     yield strategy
 
 
@@ -203,6 +210,7 @@ def test_strategy(
     token,
     gemJoinAdapter,
     osmProxy,
+    whitelistedOSM,
     price_oracle_usd,
     price_oracle_eth,
     gov,
@@ -211,8 +219,8 @@ def test_strategy(
         TestStrategy,
         vault,
         yvault,
-        f"StrategyMakerV2{token.symbol()}",
-        "0x4554482d43000000000000000000000000000000000000000000000000000000",
+        f"StrategyMakerV2_{token.symbol()}",
+        "0x5946492d41000000000000000000000000000000000000000000000000000000",
         gemJoinAdapter,
         osmProxy,
         price_oracle_usd,
@@ -224,7 +232,9 @@ def test_strategy(
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # Allow the strategy to query the OSM proxy
+    whitelistedOSM.set_user(osmProxy, True, {"from": gov})
     osmProxy.setAuthorized(strategy, {"from": gov})
+
     yield strategy
 
 
@@ -258,8 +268,8 @@ def cloner(
         MakerDaiDelegateCloner,
         vault,
         yvault,
-        f"StrategyMakerV2{token.symbol()}",
-        "0x4554482d43000000000000000000000000000000000000000000000000000000",
+        f"StrategyMakerV2_{token.symbol()}",
+        "0x5946492d41000000000000000000000000000000000000000000000000000000",
         gemJoinAdapter,
         osmProxy,
         price_oracle_usd,

@@ -196,7 +196,7 @@ def test_tend_trigger_conditions(
     assert strategy.tendTrigger(1) == False
 
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(Wei("100_000 ether"), {"from": token_whale})
+    vault.deposit(Wei("1_000 ether"), {"from": token_whale})
 
     # Send the funds through the strategy to invest
     chain.sleep(1)

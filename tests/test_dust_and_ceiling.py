@@ -7,7 +7,7 @@ def test_small_deposit_does_not_generate_debt_under_floor(
     vault, test_strategy, token, token_whale, yvault, borrow_token, gov
 ):
     price = test_strategy._getPrice()
-    floor = Wei("4_990 ether")  # assume a price floor of 5k as in ETH-C
+    floor = Wei("9_990 ether")  # assume a price floor of 10k as in YFI-A
 
     # Amount in want that generates 'floor' debt minus a treshold
     token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (
@@ -21,7 +21,7 @@ def test_small_deposit_does_not_generate_debt_under_floor(
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
-    # Debt floor is 5k for ETH-C, so the strategy should not take any debt
+    # Debt floor is 10k for YFI-A, so the strategy should not take any debt
     # with a lower deposit amount
     assert test_strategy.balanceOfDebt() == 0
     assert yvault.balanceOf(test_strategy) == 0
@@ -43,7 +43,7 @@ def test_deposit_after_passing_debt_floor_generates_debt(
     vault, test_strategy, token, token_whale, yvault, borrow_token, gov, RELATIVE_APPROX
 ):
     price = test_strategy._getPrice()
-    floor = Wei("4_990 ether")  # assume a price floor of 5k as in ETH-C
+    floor = Wei("9_990 ether")  # assume a price floor of 10k as in YFI-A
 
     # Amount in want that generates 'floor' debt minus a treshold
     token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (
@@ -164,7 +164,7 @@ def test_large_want_balance_does_not_generate_debt_over_ceiling(
 ):
     # Deposit to the vault and send funds through the strategy
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(Wei("250_000 ether"), {"from": token_whale})
+    vault.deposit(Wei("1_000 ether"), {"from": token_whale})
 
     # Send the funds through the strategy to invest
     chain.sleep(1)
@@ -191,7 +191,7 @@ def test_deposit_after_ceiling_reached_should_not_mint_more_dai(
 ):
     # Deposit to the vault and send funds through the strategy
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(Wei("250_000 ether"), {"from": token_whale})
+    vault.deposit(Wei("1_000 ether"), {"from": token_whale})
 
     # Send the funds through the strategy to invest
     chain.sleep(1)
@@ -242,7 +242,7 @@ def test_withdraw_under_floor_without_funds_to_cancel_entire_debt_should_fail(
     test_strategy.setLeaveDebtBehind(False, {"from": gov})
 
     price = test_strategy._getPrice()
-    floor = Wei("5_100 ether")  # assume a price floor of 5k as in ETH-C
+    floor = Wei("10_100 ether")  # assume a price floor of 10k as in YFI-A
 
     # Amount in want that generates 'floor' debt minus a treshold
     token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (

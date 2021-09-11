@@ -19,11 +19,11 @@ def test_direct_transfer_increments_profits(
     assert initialProfit == 0
 
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(1000 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(100 * (10 ** token.decimals()), {"from": token_whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    amount = 5 * (10 ** token.decimals())
+    amount = 0.05 * (10 ** token.decimals())
     token.transfer(strategy, amount, {"from": token_whale})
 
     chain.sleep(1)
@@ -100,7 +100,7 @@ def test_direct_transfer_with_actual_profits(
     assert initialProfit == 0
 
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(10000 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(500 * (10 ** token.decimals()), {"from": token_whale})
 
     chain.sleep(1)
     strategy.harvest({"from": gov})

@@ -53,7 +53,7 @@ def test_high_loss_causes_healthcheck_revert(
 
     # Send some funds to the strategy
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(1 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(0.2 * (10 ** token.decimals()), {"from": token_whale})
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 
@@ -79,7 +79,7 @@ def test_loss_under_max_ratio_does_not_revert(
 
     # Send some funds to the strategy
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
-    vault.deposit(1 * (10 ** token.decimals()), {"from": token_whale})
+    vault.deposit(0.2 * (10 ** token.decimals()), {"from": token_whale})
     chain.sleep(1)
     test_strategy.harvest({"from": gov})
 

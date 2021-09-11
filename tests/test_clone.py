@@ -73,6 +73,7 @@ def test_clone(
     dai_whale,
     gemJoinAdapter,
     osmProxy,
+    whitelistedOSM,
     price_oracle_usd,
     price_oracle_eth,
     gov,
@@ -96,6 +97,7 @@ def test_clone(
     )
 
     # White-list the strategy in the OSM!
+    whitelistedOSM.set_user(osmProxy, True, {"from": gov})
     osmProxy.setAuthorized(cloned_strategy, {"from": gov})
 
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})

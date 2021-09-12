@@ -28,12 +28,12 @@ contract YFIOSMAdapter is IOSMedianizer {
         return YFIOSMProxy.peek();
     }
 
-    function setAuthorized(address _authorized) external {
+    function setAuthorized(address _authorized) external override {
         _onlyGovernance();
         authorizedStrategies[_authorized] = true;
     }
 
-    function revokeAuthorized(address _authorized) external {
+    function revokeAuthorized(address _authorized) external override {
         _onlyGovernance();
         authorizedStrategies[_authorized] = false;
     }

@@ -115,7 +115,7 @@ def test_direct_transfer_with_actual_profits(
     chain.mine(1)
 
     # receive a direct transfer
-    airdropAmount = 10 * (10 ** token.decimals())
+    airdropAmount = 0.5 * (10 ** token.decimals())
     token.transfer(strategy, airdropAmount, {"from": token_whale})
 
     # sleep for another day

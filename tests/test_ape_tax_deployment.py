@@ -45,7 +45,7 @@ def test_ape_tax(
 
     # White-list the strategy in the OSM!
     whitelistedOSM.set_user(osmProxy, True, {"from": daddy})
-    osmProxy.setAuthorized(strategy, {"from": daddy})
+    osmProxy.setAuthorized(cloned_strategy, {"from": daddy})
 
     # Reduce other strategies debt allocation
     for i in range(0, 20):
@@ -65,7 +65,7 @@ def test_ape_tax(
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(5 * (10 ** token.decimals()), {"from": token_whale})
 
-    cloned_strategy.harvest({"from": daddy})
+    cloned_strategy.harvest({"from": gov})
     assert yvault.balanceOf(cloned_strategy) > 0
 
     print(f"After first harvest")
@@ -84,7 +84,7 @@ def test_ape_tax(
     # Send some profit to yvDAI
     dai.transfer(yvault, yvault.totalDebt() * 0.01, {"from": dai_whale})
     cloned_strategy.setLeaveDebtBehind(False, {"from": gov})
-    tx = cloned_strategy.harvest({"from": daddy})
+    tx = cloned_strategy.harvest({"from": gov})
 
     print(f"After second harvest")
     print(
@@ -101,7 +101,7 @@ def test_ape_tax(
     chain.mine(1)
 
     vault.updateStrategyDebtRatio(cloned_strategy, 0, {"from": gov})
-    cloned_strategy.harvest({"from": daddy})
+    cloned_strategy.harvest({"from": gov})
 
     print(f"After third harvest")
     print(

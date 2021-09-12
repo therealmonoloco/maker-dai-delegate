@@ -73,7 +73,10 @@ def test_deposit_after_passing_debt_floor_generates_debt(
     # Ensure that we have now taken on debt and deposited into yVault
     assert yvault.balanceOf(test_strategy) > 0
     assert test_strategy.balanceOfDebt() > 0
-    assert test_strategy.balanceOfMakerVault() == token_floor + additional_deposit
+    assert (
+        pytest.approx(test_strategy.balanceOfMakerVault(), rel=RELATIVE_APPROX)
+        == token_floor + additional_deposit
+    )
 
     # Collateral with no debt should be a high ratio
     assert (

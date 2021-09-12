@@ -1,6 +1,6 @@
 import pytest
 
-from brownie import Contract, reverts
+from brownie import Contract, interface, reverts
 
 
 def test_migration(
@@ -44,7 +44,7 @@ def test_migration(
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
 
     # Allow the new strategy to query the OSM proxy
-    osmProxy = Contract(strategy.wantToUSDOSMProxy())
+    osmProxy = interface.IOSMedianizer(strategy.wantToUSDOSMProxy())
     osmProxy.setAuthorized(new_strategy, {"from": gov})
 
     orig_cdp_id = strategy.cdpId()

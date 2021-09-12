@@ -5,22 +5,33 @@ from eth_abi import encode_single
 
 
 def test_prod(
-    weth, dai, strategist, weth_whale, dai_whale, MakerDaiDelegateCloner, Strategy
+    token,
+    dai,
+    strategist,
+    token_whale,
+    dai_whale,
+    osmProxy,
+    MakerDaiDelegateCloner,
+    Strategy
 ):
-    vault = Contract("0xa258C4606Ca8206D8aA700cE2143D7db854D168c")
+    vault = Contract("0xE14d13d8B3b85aF791b2AADD661cDBd5E6097Db1")
     gov = vault.governance()
     yvault = Contract("0xdA816459F1AB5631232FE5e97a05BBBb94970c95")
-    gemJoinAdapter = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E")
-    osmProxy = Contract("0xCF63089A8aD2a9D8BD6Bb8022f3190EB7e1eD0f1")
-    price_oracle_usd = Contract("0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
+    gemJoinAdapter = Contract("0x3ff33d9162aD47660083D7DC4bC02Fb231c81677")
+    whitelistedOSM = Contract("0x208EfCD7aad0b5DD49438E0b6A0f38E951A50E5f")
+
+    ##### CHANGE ME TO PRODUCTION ADDRESS!
+    # osmProxy = Contract("0xCF63089A8aD2a9D8BD6Bb8022f3190EB7e1eD0f1")
+
+    price_oracle_usd = Contract("0xA027702dbb89fbd58938e4324ac03B58d812b0E1")
     price_oracle_eth = Contract("0x7c5d4F8345e66f68099581Db340cd65B078C41f4")
 
     cloner = strategist.deploy(
         MakerDaiDelegateCloner,
         vault,
         yvault,
-        f"StrategyMakerV2_ETH-C",
-        "0x4554482d43000000000000000000000000000000000000000000000000000000",  # ETH-C
+        f"StrategyMakerV2_YFI-A",
+        "0x5946492d41000000000000000000000000000000000000000000000000000000",  # YFI-A
         gemJoinAdapter,
         osmProxy,
         price_oracle_usd,
@@ -35,6 +46,7 @@ def test_prod(
     assert strategy.rewards() == "0xc491599b9A20c3A2F0A85697Ee6D9434EFa9f503"
 
     # White-list the strategy in the OSM!
+    whitelistedOSM.set_user(osmProxy, True, {"from": gov})
     osmProxy.setAuthorized(strategy, {"from": gov})
 
     # Reduce other strategies debt allocation
@@ -47,8 +59,8 @@ def test_prod(
 
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
 
-    weth.approve(vault, 2 ** 256 - 1, {"from": weth_whale})
-    vault.deposit(2 * (10 ** weth.decimals()), {"from": weth_whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(2 * (10 ** token.decimals()), {"from": token_whale})
 
     strategy.harvest({"from": gov})
     assert yvault.balanceOf(strategy) > 0

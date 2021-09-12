@@ -101,7 +101,6 @@ def price_oracle_usd():
 
 @pytest.fixture
 def price_oracle_eth():
-    # WILL NOT BE USED FOR ETH
     chainlink_oracle = interface.AggregatorInterface(
         "0x7c5d4F8345e66f68099581Db340cd65B078C41f4"
     )

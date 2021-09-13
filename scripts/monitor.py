@@ -18,6 +18,7 @@ def print_monitoring_info_for_strategy(s):
 
     s = Contract(s)
     want = Contract(s.want())
+    vault = Contract(s.vault())
     yvault = Contract(s.yVault())
     maker_dai_delegate = Contract("0xf728c1645739b1d4367A94232d7473016Df908E7")
 
@@ -46,6 +47,7 @@ def print_monitoring_info_for_strategy(s):
     output.append(
         f"Liquidation ratio: {maker_dai_delegate.getLiquidationRatio(s.ilk())/1e27:.2f}"
     )
+    output.append(f"Debt ratio: {vault.strategies(s).dict()['debtRatio']/100:.2f}%")
 
     if s.tendTrigger(1):
         output.append(

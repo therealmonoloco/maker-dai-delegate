@@ -13,12 +13,16 @@ def test_unauthorized_foresight_reverts(osmAdapter, user):
         osmAdapter.foresight({"from": user})
 
 
-def test_authorized_foresight_returns_price(osmAdapter, user, gov):
+def test_authorized_foresight_returns_price(osmAdapter, user, gov, whitelistedOSM):
     osmAdapter.setAuthorized(user, {"from": gov})
 
     (price, has) = osmAdapter.foresight({"from": user})
-    assert price > 0
-    assert has == True
+
+    whitelistedOSM.set_user(user, True, {"from": gov})
+    (osmPrice, osmHas) = whitelistedOSM.peep({"from": user})
+
+    assert price == osmPrice
+    assert has == osmHas
 
 
 def test_unauthorized_read_reverts(osmAdapter, user):
@@ -26,12 +30,16 @@ def test_unauthorized_read_reverts(osmAdapter, user):
         osmAdapter.read({"from": user})
 
 
-def test_authorized_read_returns_price(osmAdapter, user, gov):
+def test_authorized_read_returns_price(osmAdapter, user, gov, whitelistedOSM):
     osmAdapter.setAuthorized(user, {"from": gov})
 
     (price, has) = osmAdapter.read({"from": user})
-    assert price > 0
-    assert has == True
+
+    whitelistedOSM.set_user(user, True, {"from": gov})
+    (osmPrice, osmHas) = whitelistedOSM.peek({"from": user})
+
+    assert price == osmPrice
+    assert has == osmHas
 
 
 def test_set_authorized_from_governance_is_allowed(osmAdapter, user, gov):

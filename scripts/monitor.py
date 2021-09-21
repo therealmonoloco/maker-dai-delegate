@@ -7,10 +7,15 @@ telegram_bot_key = os.getenv("TELEGRAM_BOT_KEY")
 
 
 def main():
-    output = print_monitoring_info_for_strategy(
+    eth_c = print_monitoring_info_for_strategy(
         "0xd33535e9F2E09485aC9cE8b27F865251161065E0"
     )
-    send_msg("\n".join(output))
+    send_msg("\n".join(eth_c))
+
+    yfi_a = print_monitoring_info_for_strategy(
+        "0x19b2c8b3C601E9690ee524B02d4aCA058Db8B0D7"
+    )
+    send_msg("\n".join(yfi_a))
 
 
 def print_monitoring_info_for_strategy(s):

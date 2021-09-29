@@ -176,3 +176,22 @@ def test_migrate_dai_yvault_acl(
     strategy.harvest({"from": gov})
     strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": gov})
     assert dai.allowance(strategy, new_dai_yvault) == 2 ** 256 - 1
+
+
+def test_emergency_debt_repayment_acl(
+    strategy, gov, strategist, management, guardian, user
+):
+    strategy.emergencyDebtRepayment(0, {"from": gov})
+    assert strategy.balanceOfDebt() == 0
+
+    strategy.emergencyDebtRepayment(0, {"from": strategist})
+    assert strategy.balanceOfDebt() == 0
+
+    strategy.emergencyDebtRepayment(0, {"from": guardian})
+    assert strategy.balanceOfDebt() == 0
+
+    strategy.emergencyDebtRepayment(0, {"from": management})
+    assert strategy.balanceOfDebt() == 0
+
+    with reverts("!authorized"):
+        strategy.emergencyDebtRepayment(0, {"from": user})

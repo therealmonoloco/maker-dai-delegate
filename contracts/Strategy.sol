@@ -265,6 +265,15 @@ contract Strategy is BaseStrategy {
         }
     }
 
+    // Allow external debt repayment
+    // Setting 'fromRatio' to zero attempts to repay all debt
+    function emergencyDebtRepayment(uint256 fromRatio)
+        external
+        onlyEmergencyAuthorized
+    {
+        _repayDebt(fromRatio);
+    }
+
     // ******** OVERRIDEN METHODS FROM BASE CONTRACT ************
 
     function name() external view override returns (string memory) {

@@ -440,8 +440,10 @@ contract Strategy is BaseStrategy {
 
         // If we could mint more DAI, check that there is DAI available to mint
         // Otherwise do not adjust the position
+        // We also check that some DAI was minted before to ensure we are over min debt
         return
             (currentRatio > collateralizationRatio.add(rebalanceTolerance)) &&
+            balanceOfDebt() > 0 &&
             MakerDaiDelegateLib.isDaiAvailableToMint(ilk);
     }
 

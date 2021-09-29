@@ -303,3 +303,48 @@ def test_small_withdraw_cancels_corresponding_debt(
     assert pytest.approx(
         shares_before * (1 - to_withdraw_pct), rel=RELATIVE_APPROX
     ) == yvault.balanceOf(strategy)
+
+
+def test_tend_trigger_with_debt_under_dust_returns_false(
+    vault, test_strategy, token, token_whale, gov
+):
+    price = test_strategy._getPrice()
+    floor = Wei("4_990 ether")  # assume a price floor of 5k as in ETH-C
+
+    # Amount in want that generates 'floor' debt minus a treshold
+    token_floor = ((test_strategy.collateralizationRatio() * floor / 1e18) / price) * (
+        10 ** token.decimals()
+    )
+
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, token_floor, {"from": token_whale})
+
+    vault.deposit(token_floor, {"from": token_whale})
+    chain.sleep(1)
+    test_strategy.harvest({"from": gov})
+
+    # Debt floor is 5k for ETH-C, so the strategy should not take any debt
+    # with a lower deposit amount
+    assert test_strategy.tendTrigger(1) == False
+
+
+def test_tend_trigger_without_more_mintable_dai_returns_false(
+    vault, strategy, token, token_whale, gov
+):
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(Wei("250_000 ether"), {"from": token_whale})
+
+    # Send the funds through the strategy to invest
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    assert strategy.tendTrigger(1) == False
+
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(token.balanceOf(token_whale), {"from": token_whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    assert strategy.tendTrigger(1) == False

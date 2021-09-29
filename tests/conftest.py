@@ -39,7 +39,7 @@ def management(accounts):
 
 @pytest.fixture
 def strategist(accounts):
-    yield accounts[4]
+    yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
 
 
 @pytest.fixture

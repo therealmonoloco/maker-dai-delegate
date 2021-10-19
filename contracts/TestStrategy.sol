@@ -14,7 +14,6 @@ contract TestStrategy is Strategy {
         bytes32 _ilk,
         address _gemJoin,
         address _wantToUSDOSMProxy,
-        address _chainlinkWantToUSDPriceFeed,
         address _chainlinkWantToETHPriceFeed
     )
         public
@@ -25,7 +24,6 @@ contract TestStrategy is Strategy {
             _ilk,
             _gemJoin,
             _wantToUSDOSMProxy,
-            _chainlinkWantToUSDPriceFeed,
             _chainlinkWantToETHPriceFeed
         )
     {}

@@ -12,7 +12,6 @@ def test_prod(
     yvault = Contract("0xdA816459F1AB5631232FE5e97a05BBBb94970c95")
     gemJoinAdapter = Contract("0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E")
     osmProxy = Contract("0xCF63089A8aD2a9D8BD6Bb8022f3190EB7e1eD0f1")
-    price_oracle_usd = Contract("0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
     price_oracle_eth = Contract("0x7c5d4F8345e66f68099581Db340cd65B078C41f4")
 
     cloner = strategist.deploy(
@@ -23,7 +22,6 @@ def test_prod(
         "0x4554482d43000000000000000000000000000000000000000000000000000000",  # ETH-C
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
     )
 

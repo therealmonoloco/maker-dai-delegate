@@ -36,7 +36,6 @@ def test_migration(
             strategy.ilk(),
             strategy.gemJoinAdapter(),
             strategy.wantToUSDOSMProxy(),
-            strategy.chainlinkWantToUSDPriceFeed(),
             strategy.chainlinkWantToETHPriceFeed(),
         ).return_value
     )

@@ -57,9 +57,6 @@ contract Strategy is BaseStrategy {
     // Use Chainlink oracle to obtain latest want/ETH price
     AggregatorInterface public chainlinkWantToETHPriceFeed;
 
-    // Use Chainlink oracle to obtain latest want/USD price
-    AggregatorInterface public chainlinkWantToUSDPriceFeed;
-
     // DAI yVault
     IVault public yVault;
 
@@ -84,9 +81,6 @@ contract Strategy is BaseStrategy {
     // If set to true the strategy will never try to repay debt by selling want
     bool public leaveDebtBehind;
 
-    // Use ChainLink for faster price updates
-    bool public useChainLink;
-
     // Name of the strategy
     string internal strategyName;
 
@@ -99,7 +93,6 @@ contract Strategy is BaseStrategy {
         bytes32 _ilk,
         address _gemJoin,
         address _wantToUSDOSMProxy,
-        address _chainlinkWantToUSDPriceFeed,
         address _chainlinkWantToETHPriceFeed
     ) public BaseStrategy(_vault) {
         _initializeThis(
@@ -108,7 +101,6 @@ contract Strategy is BaseStrategy {
             _ilk,
             _gemJoin,
             _wantToUSDOSMProxy,
-            _chainlinkWantToUSDPriceFeed,
             _chainlinkWantToETHPriceFeed
         );
     }
@@ -120,7 +112,6 @@ contract Strategy is BaseStrategy {
         bytes32 _ilk,
         address _gemJoin,
         address _wantToUSDOSMProxy,
-        address _chainlinkWantToUSDPriceFeed,
         address _chainlinkWantToETHPriceFeed
     ) public {
         // Make sure we only initialize one time
@@ -138,7 +129,6 @@ contract Strategy is BaseStrategy {
             _ilk,
             _gemJoin,
             _wantToUSDOSMProxy,
-            _chainlinkWantToUSDPriceFeed,
             _chainlinkWantToETHPriceFeed
         );
     }
@@ -149,7 +139,6 @@ contract Strategy is BaseStrategy {
         bytes32 _ilk,
         address _gemJoin,
         address _wantToUSDOSMProxy,
-        address _chainlinkWantToUSDPriceFeed,
         address _chainlinkWantToETHPriceFeed
     ) internal {
         yVault = IVault(_yVault);
@@ -157,9 +146,6 @@ contract Strategy is BaseStrategy {
         ilk = _ilk;
         gemJoinAdapter = _gemJoin;
         wantToUSDOSMProxy = IOSMedianizer(_wantToUSDOSMProxy);
-        chainlinkWantToUSDPriceFeed = AggregatorInterface(
-            _chainlinkWantToUSDPriceFeed
-        );
         chainlinkWantToETHPriceFeed = AggregatorInterface(
             _chainlinkWantToETHPriceFeed
         );
@@ -183,9 +169,6 @@ contract Strategy is BaseStrategy {
 
         // If we lose money in yvDAI then we are not OK selling want to repay it
         leaveDebtBehind = true;
-
-        // Use ChainLink price feed by default in addition to the OSM
-        useChainLink = true;
 
         // Define maximum acceptable loss on withdrawal to be 0.01%.
         maxLoss = 1;
@@ -233,14 +216,6 @@ contract Strategy is BaseStrategy {
         onlyEmergencyAuthorized
     {
         leaveDebtBehind = _leaveDebtBehind;
-    }
-
-    // If set to true the strategy will use ChainLink as an additional price feed
-    function setUseChainLink(bool _useChainLink)
-        external
-        onlyEmergencyAuthorized
-    {
-        useChainLink = _useChainLink;
     }
 
     // Required to move funds to a new cdp and use a different cdpId after migration
@@ -790,26 +765,6 @@ contract Strategy is BaseStrategy {
             }
         } catch {
             // Ignore price peep()'d from OSM
-        }
-
-        // Intent of using ChainLink is being able to adjust to swift price changes quicker than the
-        // next OSM update. In ugly days being able to react faster should serve as an extra assurance
-        // (e.g: detecting that a keeper is failing and we need to handle the situation manually).
-        // ChainLink trigger parameters include both a heartbeat timestamp and a price deviation
-        // treshold that could be helpful in periods of high volatility.
-        if (useChainLink) {
-            try chainlinkWantToUSDPriceFeed.latestAnswer() returns (
-                int256 chainLinkPrice
-            ) {
-                // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
-                uint256 convertedPrice = uint256(chainLinkPrice).mul(1e10);
-
-                if (convertedPrice > 0) {
-                    minPrice = Math.min(minPrice, convertedPrice);
-                }
-            } catch {
-                // Ignore price from ChainLink
-            }
         }
 
         // par is crucial to this calculation as it defines the relationship between DAI and

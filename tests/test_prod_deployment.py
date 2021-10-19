@@ -48,7 +48,7 @@ def test_prod(
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
 
     weth.approve(vault, 2 ** 256 - 1, {"from": weth_whale})
-    vault.deposit(5 * (10 ** weth.decimals()), {"from": weth_whale})
+    vault.deposit(250 * (10 ** weth.decimals()), {"from": weth_whale})
 
     strategy.harvest({"from": gov})
     assert yvault.balanceOf(strategy) > 0
@@ -65,7 +65,7 @@ def test_prod(
     chain.mine(1)
 
     # Send some profit to yvDAI
-    dai.transfer(yvault, yvault.totalDebt() * 0.01, {"from": dai_whale})
+    dai.transfer(yvault, yvault.totalDebt() * 0.02, {"from": dai_whale})
     strategy.setLeaveDebtBehind(False, {"from": gov})
     tx = strategy.harvest({"from": gov})
 
@@ -92,5 +92,5 @@ def test_prod(
     )
     print(f"totalLoss: {vault.strategies(strategy).dict()['totalLoss']/1e18:_}")
 
-    assert vault.strategies(strategy).dict()["totalLoss"] < Wei("0.5 ether")
+    assert vault.strategies(strategy).dict()["totalLoss"] < Wei("0.75 ether")
     assert vault.strategies(strategy).dict()["totalDebt"] == 0

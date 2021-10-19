@@ -348,3 +348,32 @@ def test_tend_trigger_without_more_mintable_dai_returns_false(
     strategy.harvest({"from": gov})
 
     assert strategy.tendTrigger(1) == False
+
+
+def test_tend_trigger_with_funds_in_cdp_but_no_debt_returns_false(
+    vault, strategy, token, token_whale, gov, dai, dai_whale, yvDAI
+):
+    # Deposit to the vault and send funds through the strategy
+    token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})
+    vault.deposit(Wei("1_000 ether"), {"from": token_whale})
+
+    # Send the funds through the strategy to invest
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    assert strategy.tendTrigger(1) == False
+
+    # Send some profit to yVault
+    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.005, {"from": dai_whale})
+
+    # Harvest 2: Realize profit
+    strategy.harvest({"from": gov})
+    chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
+    chain.mine(1)
+
+    strategy.emergencyDebtRepayment(0, {"from": strategy.strategist()})
+
+    assert strategy.balanceOfMakerVault() > 0
+    assert strategy.balanceOfDebt() == 0
+    assert strategy.getCurrentMakerVaultRatio() / 1e18 > 1000
+    assert strategy.tendTrigger(1) == False

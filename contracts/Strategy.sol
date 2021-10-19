@@ -84,6 +84,9 @@ contract Strategy is BaseStrategy {
     // If set to true the strategy will never try to repay debt by selling want
     bool public leaveDebtBehind;
 
+    // Use ChainLink for faster price updates
+    bool public useChainLink;
+
     // Name of the strategy
     string internal strategyName;
 
@@ -181,6 +184,9 @@ contract Strategy is BaseStrategy {
         // If we lose money in yvDAI then we are not OK selling want to repay it
         leaveDebtBehind = true;
 
+        // Use ChainLink price feed by default in addition to the OSM
+        useChainLink = true;
+
         // Define maximum acceptable loss on withdrawal to be 0.01%.
         maxLoss = 1;
     }
@@ -227,6 +233,14 @@ contract Strategy is BaseStrategy {
         onlyEmergencyAuthorized
     {
         leaveDebtBehind = _leaveDebtBehind;
+    }
+
+    // If set to true the strategy will use ChainLink as an additional price feed
+    function setUseChainLink(bool _useChainLink)
+        external
+        onlyEmergencyAuthorized
+    {
+        useChainLink = _useChainLink;
     }
 
     // Required to move funds to a new cdp and use a different cdpId after migration
@@ -749,28 +763,60 @@ contract Strategy is BaseStrategy {
 
     // ----------------- INTERNAL CALCS -----------------
 
+    // Returns the minimum price available
     function _getWantTokenPrice() internal view returns (uint256) {
-        uint256 minPrice;
+        // Use price from spotter as base
+        uint256 minPrice = MakerDaiDelegateLib.getSpotPrice(ilk);
 
-        // Assume we are white-listed in the OSM
-        (uint256 current, ) = wantToUSDOSMProxy.read();
-        (uint256 future, ) = wantToUSDOSMProxy.foresight();
+        // peek the OSM to get current price
+        try wantToUSDOSMProxy.read() returns (
+            uint256 current,
+            bool currentIsValid
+        ) {
+            if (currentIsValid && current > 0) {
+                minPrice = Math.min(minPrice, current);
+            }
+        } catch {
+            // Ignore price peek()'d from OSM
+        }
 
-        minPrice = Math.min(future, current);
+        // peep the OSM to get future price
+        try wantToUSDOSMProxy.foresight() returns (
+            uint256 future,
+            bool futureIsValid
+        ) {
+            if (futureIsValid && future > 0) {
+                minPrice = Math.min(minPrice, future);
+            }
+        } catch {
+            // Ignore price peep()'d from OSM
+        }
 
-        // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
-        uint256 chainLinkPrice =
-            uint256(chainlinkWantToUSDPriceFeed.latestAnswer()).mul(1e10);
+        // Intent of using ChainLink is being able to adjust to swift price changes quicker than the
+        // next OSM update. In ugly days being able to react faster should serve as an extra assurance
+        // (e.g: detecting that a keeper is failing and we need to handle the situation manually).
+        // ChainLink trigger parameters include both a heartbeat timestamp and a price deviation
+        // treshold that could be helpful in periods of high volatility.
+        if (useChainLink) {
+            try chainlinkWantToUSDPriceFeed.latestAnswer() returns (
+                int256 chainLinkPrice
+            ) {
+                // Non-ETH pairs have 8 decimals, so we need to adjust it to 18
+                uint256 convertedPrice = uint256(chainLinkPrice).mul(1e10);
 
-        // Return the worst price available in [wad]
+                if (convertedPrice > 0) {
+                    minPrice = Math.min(minPrice, convertedPrice);
+                }
+            } catch {
+                // Ignore price from ChainLink
+            }
+        }
+
         // par is crucial to this calculation as it defines the relationship between DAI and
         // 1 unit of value in the price
-        minPrice = Math.min(minPrice, chainLinkPrice).mul(RAY).div(
-            MakerDaiDelegateLib.getDaiPar()
-        );
+        minPrice = minPrice.mul(RAY).div(MakerDaiDelegateLib.getDaiPar());
 
-        // If peek() or peep() return a price of 0 or an error then we are
-        // dealing with an invalid price or Maker Protocol Emergency Shutdown
+        // If price is set to 0 then we hope no liquidations are taking place
         require(minPrice > 0); // dev: invalid price returned from oracle
         return minPrice;
     }

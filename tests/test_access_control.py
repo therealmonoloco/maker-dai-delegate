@@ -195,3 +195,22 @@ def test_emergency_debt_repayment_acl(
 
     with reverts("!authorized"):
         strategy.emergencyDebtRepayment(0, {"from": user})
+
+
+def test_use_chainlink_acl(strategy, gov, strategist, management, guardian, user):
+    assert strategy.useChainLink() == True
+
+    strategy.setUseChainLink(False, {"from": gov})
+    assert strategy.useChainLink() == False
+
+    strategy.setUseChainLink(True, {"from": strategist})
+    assert strategy.useChainLink() == True
+
+    strategy.setUseChainLink(False, {"from": guardian})
+    assert strategy.useChainLink() == False
+
+    strategy.setUseChainLink(True, {"from": management})
+    assert strategy.useChainLink() == True
+
+    with reverts("!authorized"):
+        strategy.setUseChainLink(False, {"from": user})

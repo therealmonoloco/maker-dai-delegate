@@ -80,8 +80,8 @@ contract Strategy is BaseStrategy {
     // Allow the collateralization ratio to drift a bit in order to avoid cycles
     uint256 public rebalanceTolerance;
 
-    // Max acceptable base fee to take more debt
-    uint256 public maxTendBaseFee;
+    // Max acceptable base fee to take more debt or harvest
+    uint256 public maxAcceptableBaseFee;
 
     // Maximum acceptable loss on withdrawal. Default to 0.01%.
     uint256 public maxLoss;
@@ -182,17 +182,17 @@ contract Strategy is BaseStrategy {
         maxLoss = 1;
 
         // Set max acceptable base fee to take on more debt to 60 gwei
-        maxTendBaseFee = 60 * 1e9;
+        maxAcceptableBaseFee = 60 * 1e9;
     }
 
     // ----------------- SETTERS & MIGRATION -----------------
 
     // Maximum acceptable base fee of current block to take on more debt
-    function setMaxTendBaseFee(uint256 _maxTendBaseFee)
+    function setMaxAcceptableBaseFee(uint256 _maxAcceptableBaseFee)
         external
         onlyEmergencyAuthorized
     {
-        maxTendBaseFee = _maxTendBaseFee;
+        maxAcceptableBaseFee = _maxAcceptableBaseFee;
     }
 
     // Target collateralization ratio to maintain within bounds
@@ -785,7 +785,7 @@ contract Strategy is BaseStrategy {
             baseFee = 1000 * 1e9;
         }
 
-        return baseFee <= maxTendBaseFee;
+        return baseFee <= maxAcceptableBaseFee;
     }
 
     // ----------------- INTERNAL CALCS -----------------

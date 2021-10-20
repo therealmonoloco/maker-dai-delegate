@@ -255,12 +255,26 @@ contract Strategy is BaseStrategy {
     }
 
     // Allow external debt repayment
-    // Setting 'fromRatio' to zero attempts to repay all debt
-    function emergencyDebtRepayment(uint256 fromRatio)
+    // Attempt to take currentRatio to target c-ratio
+    // Passing zero will repay all debt if possible
+    function emergencyDebtRepayment(uint256 currentRatio)
         external
         onlyEmergencyAuthorized
     {
-        _repayDebt(fromRatio);
+        _repayDebt(currentRatio);
+    }
+
+    // Allow repayment of an arbitrary amount of Dai without having to
+    // grant access to the CDP in case of an emergency
+    // Difference with `emergencyDebtRepayment` function above is that here we
+    // are short-circuiting all strategy logic and repaying Dai at once
+    // This could be helpful if for example yvDAI withdrawals are failing and
+    // we want to do a Dai airdrop and direct debt repayment instead
+    function repayDebtWithDaiBalance(uint256 amount)
+        external
+        onlyEmergencyAuthorized
+    {
+        _repayInvestmentTokenDebt(amount);
     }
 
     // ******** OVERRIDEN METHODS FROM BASE CONTRACT ************

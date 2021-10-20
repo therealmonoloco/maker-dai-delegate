@@ -195,3 +195,47 @@ def test_emergency_debt_repayment_acl(
 
     with reverts("!authorized"):
         strategy.emergencyDebtRepayment(0, {"from": user})
+
+
+def test_repay_debt_acl(
+    vault,
+    strategy,
+    token,
+    amount,
+    dai,
+    dai_whale,
+    gov,
+    strategist,
+    management,
+    guardian,
+    keeper,
+    user,
+):
+    # Deposit to the vault
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
+    # Send funds through the strategy
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    dai.transfer(strategy, 1000 * 1e18, {"from": dai_whale})
+    debt_balance = strategy.balanceOfDebt()
+
+    strategy.repayDebtWithDaiBalance(1, {"from": gov})
+    assert strategy.balanceOfDebt() == (debt_balance - 1)
+
+    strategy.repayDebtWithDaiBalance(2, {"from": strategist})
+    assert strategy.balanceOfDebt() == (debt_balance - 3)
+
+    strategy.repayDebtWithDaiBalance(3, {"from": management})
+    assert strategy.balanceOfDebt() == (debt_balance - 6)
+
+    strategy.repayDebtWithDaiBalance(4, {"from": guardian})
+    assert strategy.balanceOfDebt() == (debt_balance - 10)
+
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(5, {"from": keeper})
+
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(6, {"from": user})

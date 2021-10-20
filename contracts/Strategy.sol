@@ -461,12 +461,7 @@ contract Strategy is BaseStrategy {
         view
         override
         returns (address[] memory)
-    {
-        address[] memory protected = new address[](2);
-        protected[0] = address(investmentToken);
-        protected[1] = address(yVault);
-        return protected;
-    }
+    {}
 
     function ethToWant(uint256 _amtInWei)
         public

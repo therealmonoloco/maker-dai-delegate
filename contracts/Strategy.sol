@@ -752,7 +752,7 @@ contract Strategy is BaseStrategy {
         // Use price from spotter as base
         uint256 minPrice = MakerDaiDelegateLib.getSpotPrice(ilk);
 
-        // peek the OSM to get current price
+        // Peek the OSM to get current price
         try wantToUSDOSMProxy.read() returns (
             uint256 current,
             bool currentIsValid
@@ -761,10 +761,10 @@ contract Strategy is BaseStrategy {
                 minPrice = Math.min(minPrice, current);
             }
         } catch {
-            // Ignore price peek()'d from OSM
+            // Ignore price peek()'d from OSM. Maybe we are no longer authorized.
         }
 
-        // peep the OSM to get future price
+        // Peep the OSM to get future price
         try wantToUSDOSMProxy.foresight() returns (
             uint256 future,
             bool futureIsValid
@@ -773,16 +773,17 @@ contract Strategy is BaseStrategy {
                 minPrice = Math.min(minPrice, future);
             }
         } catch {
-            // Ignore price peep()'d from OSM
+            // Ignore price peep()'d from OSM. Maybe we are no longer authorized.
         }
+
+        // If price is set to 0 then we hope no liquidations are taking place
+        // Emergency scenarios can be handled via manual debt repayment or by
+        // granting governance access to the CDP
+        require(minPrice > 0); // dev: invalid spot price
 
         // par is crucial to this calculation as it defines the relationship between DAI and
         // 1 unit of value in the price
-        minPrice = minPrice.mul(RAY).div(MakerDaiDelegateLib.getDaiPar());
-
-        // If price is set to 0 then we hope no liquidations are taking place
-        require(minPrice > 0); // dev: invalid price returned from oracle
-        return minPrice;
+        return minPrice.mul(RAY).div(MakerDaiDelegateLib.getDaiPar());
     }
 
     function _valueOfInvestment() internal view returns (uint256) {

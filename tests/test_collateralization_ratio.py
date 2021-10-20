@@ -171,10 +171,16 @@ def test_tend_trigger_conditions(
     # Make sure we are in equilibrium
     assert strategy.tendTrigger(1) == False
 
-    # Going over the rebalancing band should need to adjust position
+    # Going under the rebalancing band should need to adjust position
+    # regardless of the max acceptable base fee
     strategy.setCollateralizationRatio(
         orig_target + rebalance_tolerance * 1.001, {"from": gov}
     )
+
+    strategy.setMaxTendBaseFee(0, {"from": strategy.strategist()})
+    assert strategy.tendTrigger(1) == True
+
+    strategy.setMaxTendBaseFee(1001 * 1e9, {"from": strategy.strategist()})
     assert strategy.tendTrigger(1) == True
 
     # Going over the target ratio but inside rebalancing band should not adjust position
@@ -183,16 +189,28 @@ def test_tend_trigger_conditions(
     )
     assert strategy.tendTrigger(1) == False
 
-    # Going under the rebalancing band should need to adjust position
+    # Going over the rebalancing band should need to adjust position
+    # but only if block's base fee is deemed to be acceptable
     strategy.setCollateralizationRatio(
         orig_target - rebalance_tolerance * 1.001, {"from": gov}
     )
+
+    # Max acceptable base fee is set to 1000 gwei for testing, so go just
+    # 1 gwei above and 1 gwei below to cover both sides
+    strategy.setMaxTendBaseFee(1001 * 1e9, {"from": strategy.strategist()})
     assert strategy.tendTrigger(1) == True
 
-    # Going under the target ratio but inside rebalancing band should not adjust position
+    strategy.setMaxTendBaseFee(1000 * 1e9, {"from": strategy.strategist()})
+    assert strategy.tendTrigger(1) == True
+
+    strategy.setMaxTendBaseFee(999 * 1e9, {"from": strategy.strategist()})
+    assert strategy.tendTrigger(1) == False
+
+    # Going over the target ratio but inside rebalancing band should not adjust position
     strategy.setCollateralizationRatio(
         orig_target - rebalance_tolerance * 0.999, {"from": gov}
     )
+    strategy.setMaxTendBaseFee(1001 * 1e9, {"from": strategy.strategist()})
     assert strategy.tendTrigger(1) == False
 
     token.approve(vault.address, 2 ** 256 - 1, {"from": token_whale})

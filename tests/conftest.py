@@ -179,6 +179,9 @@ def strategy(vault, Strategy, gov, osmProxy, cloner):
     strategy.setLeaveDebtBehind(False, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
 
+    # set a high acceptable max base fee to avoid changing test behavior
+    strategy.setMaxTendBaseFee(1500 * 1e9, {"from": gov})
+
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # Allow the strategy to query the OSM proxy
@@ -210,6 +213,9 @@ def test_strategy(
     )
     strategy.setLeaveDebtBehind(False, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
+
+    # set a high acceptable max base fee to avoid changing test behavior
+    strategy.setMaxTendBaseFee(1500 * 1e9, {"from": gov})
 
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 

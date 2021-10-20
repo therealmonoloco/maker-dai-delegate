@@ -5,7 +5,7 @@ from brownie import chain, reverts, Wei
 def test_passing_zero_should_repay_all_debt(
     vault, strategy, token, token_whale, user, gov, dai, dai_whale, yvDAI
 ):
-    amount = 100 * (10 ** token.decimals())
+    amount = 1_000 * (10 ** token.decimals())
 
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": token_whale})
@@ -17,7 +17,7 @@ def test_passing_zero_should_repay_all_debt(
     assert strategy.balanceOfDebt() > 0
 
     # Send some profit to yVault
-    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.005, {"from": dai_whale})
+    dai.transfer(yvDAI, yvDAI.totalAssets() * 0.009, {"from": dai_whale})
 
     # Harvest 2: Realize profit
     strategy.harvest({"from": gov})

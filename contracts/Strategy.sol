@@ -469,25 +469,10 @@ contract Strategy is BaseStrategy {
             return true;
         }
 
-        uint256 baseFee;
-        try baseFeeProvider.basefee_global() returns (uint256 currentBaseFee) {
-            baseFee = currentBaseFee;
-        } catch {
-            // Useful for testing until ganache supports eip1559
-            // Hard-code current base fee to 1000 gwei
-            // This also helps keepers that run in a fork without eip1559
-            // to avoid reverting and potentially abandoning the job
-            baseFee = 1000 * 1e9;
-        }
-
-        // Do not call tend() if gas costs are not acceptable at the moment
-        if (baseFee > maxTendBaseFee) {
-            return false;
-        }
-
         // Mint more DAI if possible
         return
-            (currentRatio > collateralizationRatio.add(rebalanceTolerance)) &&
+            isCurrentBaseFeeAcceptable() &&
+            currentRatio > collateralizationRatio.add(rebalanceTolerance) &&
             balanceOfDebt() > 0 &&
             MakerDaiDelegateLib.isDaiAvailableToMint(ilk);
     }
@@ -748,7 +733,7 @@ contract Strategy is BaseStrategy {
         return totalCollateral.sub(minCollateral);
     }
 
-    // ----------------- PUBLIC BALANCES -----------------
+    // ----------------- PUBLIC BALANCES AND CALCS -----------------
 
     function balanceOfWant() public view returns (uint256) {
         return want.balanceOf(address(this));
@@ -776,6 +761,22 @@ contract Strategy is BaseStrategy {
                 _getWantTokenPrice(),
                 MAX_BPS
             );
+    }
+
+    // Check if current block's base fee is under max allowed base fee
+    function isCurrentBaseFeeAcceptable() public view returns (bool) {
+        uint256 baseFee;
+        try baseFeeProvider.basefee_global() returns (uint256 currentBaseFee) {
+            baseFee = currentBaseFee;
+        } catch {
+            // Useful for testing until ganache supports london fork
+            // Hard-code current base fee to 1000 gwei
+            // This should also help keepers that run in a fork without
+            // baseFee() to avoid reverting and potentially abandoning the job
+            baseFee = 1000 * 1e9;
+        }
+
+        return baseFee <= maxTendBaseFee;
     }
 
     // ----------------- INTERNAL CALCS -----------------

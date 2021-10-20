@@ -197,6 +197,25 @@ def test_emergency_debt_repayment_acl(
         strategy.emergencyDebtRepayment(0, {"from": user})
 
 
+def test_set_max_tend_base_fee_acl(
+    strategy, gov, strategist, management, guardian, user
+):
+    strategy.setMaxTendBaseFee(100 * 1e9, {"from": gov})
+    assert strategy.maxTendBaseFee() == 100 * 1e9
+
+    strategy.setMaxTendBaseFee(200 * 1e9, {"from": strategist})
+    assert strategy.maxTendBaseFee() == 200 * 1e9
+
+    strategy.setMaxTendBaseFee(50 * 1e9, {"from": guardian})
+    assert strategy.maxTendBaseFee() == 50 * 1e9
+
+    strategy.setMaxTendBaseFee(75 * 1e9, {"from": management})
+    assert strategy.maxTendBaseFee() == 75 * 1e9
+
+    with reverts("!authorized"):
+        strategy.setMaxTendBaseFee(150 * 1e9, {"from": user})
+
+
 def test_repay_debt_acl(
     vault,
     strategy,

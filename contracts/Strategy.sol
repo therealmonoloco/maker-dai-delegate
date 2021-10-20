@@ -15,6 +15,7 @@ import "./libraries/MakerDaiDelegateLib.sol";
 
 import "../interfaces/chainlink/AggregatorInterface.sol";
 import "../interfaces/swap/ISwap.sol";
+import "../interfaces/yearn/IBaseFee.sol";
 import "../interfaces/yearn/IOSMedianizer.sol";
 import "../interfaces/yearn/IVault.sol";
 
@@ -48,6 +49,10 @@ contract Strategy is BaseStrategy {
     ISwap internal constant uniswapRouter =
         ISwap(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
+    // Provider to read current block's base fee
+    IBaseFee internal constant baseFeeProvider =
+        IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549);
+
     // Token Adapter Module for collateral
     address public gemJoinAdapter;
 
@@ -74,6 +79,9 @@ contract Strategy is BaseStrategy {
 
     // Allow the collateralization ratio to drift a bit in order to avoid cycles
     uint256 public rebalanceTolerance;
+
+    // Max acceptable base fee to take more debt
+    uint256 public maxTendBaseFee;
 
     // Maximum acceptable loss on withdrawal. Default to 0.01%.
     uint256 public maxLoss;
@@ -172,9 +180,20 @@ contract Strategy is BaseStrategy {
 
         // Define maximum acceptable loss on withdrawal to be 0.01%.
         maxLoss = 1;
+
+        // Set max acceptable base fee to take on more debt to 60 gwei
+        maxTendBaseFee = 60 * 1e9;
     }
 
     // ----------------- SETTERS & MIGRATION -----------------
+
+    // Maximum acceptable base fee of current block to take on more debt
+    function setMaxTendBaseFee(uint256 _maxTendBaseFee)
+        external
+        onlyEmergencyAuthorized
+    {
+        maxTendBaseFee = _maxTendBaseFee;
+    }
 
     // Target collateralization ratio to maintain within bounds
     function setCollateralizationRatio(uint256 _collateralizationRatio)
@@ -450,9 +469,23 @@ contract Strategy is BaseStrategy {
             return true;
         }
 
-        // If we could mint more DAI, check that there is DAI available to mint
-        // Otherwise do not adjust the position
-        // We also check that some DAI was minted before to ensure we are over min debt
+        uint256 baseFee;
+        try baseFeeProvider.basefee_global() returns (uint256 currentBaseFee) {
+            baseFee = currentBaseFee;
+        } catch {
+            // Useful for testing until ganache supports eip1559
+            // Hard-code current base fee to 1000 gwei
+            // This also helps keepers that run in a fork without eip1559
+            // to avoid reverting and potentially abandoning the job
+            baseFee = 1000 * 1e9;
+        }
+
+        // Do not call tend() if gas costs are not acceptable at the moment
+        if (baseFee > maxTendBaseFee) {
+            return false;
+        }
+
+        // Mint more DAI if possible
         return
             (currentRatio > collateralizationRatio.add(rebalanceTolerance)) &&
             balanceOfDebt() > 0 &&

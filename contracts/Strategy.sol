@@ -450,6 +450,15 @@ contract Strategy is BaseStrategy {
         (_amountFreed, ) = liquidatePosition(estimatedTotalAssets());
     }
 
+    function harvestTrigger(uint256 callCost)
+        public
+        view
+        override
+        returns (bool)
+    {
+        return isCurrentBaseFeeAcceptable() && super.harvestTrigger(callCost);
+    }
+
     function tendTrigger(uint256 callCostInWei)
         public
         view

@@ -16,31 +16,28 @@ contract TestCustomOSM is IOSMedianizer {
         revertRead = _revertRead;
     }
 
-    function setFuturePrice(uint256 _futurePrice, bool _revertForesight) external {
+    function setFuturePrice(uint256 _futurePrice, bool _revertForesight)
+        external
+    {
         futurePrice = _futurePrice;
         revertForesight = _revertForesight;
     }
 
     function foresight()
         external
-        override
         view
-        returns (uint256 price, bool osm) 
+        override
+        returns (uint256 price, bool osm)
     {
         if (revertForesight) {
-            require (1 == 2);
+            require(1 == 2);
         }
         return (futurePrice, true);
     }
 
-    function read()
-        external
-        override
-        view
-        returns (uint256 price, bool osm) 
-    {
+    function read() external view override returns (uint256 price, bool osm) {
         if (revertRead) {
-            require (1 == 2);
+            require(1 == 2);
         }
         return (currentPrice, true);
     }

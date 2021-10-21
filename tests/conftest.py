@@ -174,6 +174,11 @@ def healthCheck():
 
 
 @pytest.fixture
+def custom_osm(TestCustomOSM, gov):
+    yield TestCustomOSM.deploy({"from": gov})
+
+
+@pytest.fixture
 def strategy(vault, Strategy, gov, osmProxy, cloner):
     strategy = Strategy.at(cloner.original())
     strategy.setLeaveDebtBehind(False, {"from": gov})

@@ -3,6 +3,7 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "./Strategy.sol";
+import "../interfaces/yearn/IOSMedianizer.sol";
 
 // The purpose of this wrapper contract is to expose internal functions
 // that may contain application logic and therefore need to be unit tested.
@@ -45,5 +46,9 @@ contract TestStrategy is Strategy {
 
     function freeCollateral(uint256 collateralAmount) public {
         return _freeCollateralAndRepayDai(collateralAmount, 0);
+    }
+
+    function setCustomOSM(IOSMedianizer _wantToUSDOSMProxy) public {
+        wantToUSDOSMProxy = _wantToUSDOSMProxy;
     }
 }

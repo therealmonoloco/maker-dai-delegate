@@ -98,6 +98,7 @@ def test_clone(
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(10 * (10 ** token.decimals()), {"from": token_whale})
 
+    chain.sleep(1)
     cloned_strategy.harvest({"from": gov})
     assert yvault.balanceOf(cloned_strategy) > 0
 
@@ -107,6 +108,8 @@ def test_clone(
 
     # Send some profit to yvDAI
     dai.transfer(yvault, Wei("100_000 ether"), {"from": dai_whale})
+
+    chain.sleep(1)
     cloned_strategy.harvest({"from": gov})
 
     assert vault.strategies(cloned_strategy).dict()["totalGain"] > 0

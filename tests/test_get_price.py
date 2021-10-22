@@ -34,17 +34,15 @@ def test_current_osm_reverts_should_use_min_future_and_spot(
     with reverts():
         osm.read()
 
-    custom_osm.setFuturePrice(spot - 1, False)
+    custom_osm.setFuturePrice(spot - 1e18, False)
+    assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot - 1e18
     assert (
         pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX)
         == osm.foresight()[0]
     )
 
-    custom_osm.setFuturePrice(spot + 1, False)
-    assert (
-        pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX)
-        == osm.foresight()[0]
-    )
+    custom_osm.setFuturePrice(spot + 1e18, False)
+    assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot
     assert test_strategy._getPrice() > 0
 
 
@@ -60,15 +58,15 @@ def test_future_osm_reverts_should_use_min_future_and_spot(
     with reverts():
         osm.foresight()
 
-    custom_osm.setCurrentPrice(spot - 1, False)
+    custom_osm.setCurrentPrice(spot - 1e18, False)
+    assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot - 1e18
     assert (
-        pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == osm.read()[0]
+        pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX)
+        == osm.read()[0]
     )
 
-    custom_osm.setCurrentPrice(spot + 1, False)
-    assert (
-        pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == osm.read()[0]
-    )
+    custom_osm.setCurrentPrice(spot + 1e18, False)
+    assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot
     assert test_strategy._getPrice() > 0
 
 
@@ -80,19 +78,21 @@ def test_get_price_should_return_min_price(
 
     spot = lib.getSpotPrice(test_strategy.ilk())
 
-    custom_osm.setFuturePrice(spot + 1, False)
-    custom_osm.setCurrentPrice(spot + 1, False)
+    custom_osm.setFuturePrice(spot + 1e18, False)
+    custom_osm.setCurrentPrice(spot + 1e18, False)
     assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot
 
-    custom_osm.setFuturePrice(spot - 1, False)
-    custom_osm.setCurrentPrice(spot + 1, False)
+    custom_osm.setFuturePrice(spot - 1e18, False)
+    custom_osm.setCurrentPrice(spot + 1e18, False)
+    assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot - 1e18
     assert (
         pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX)
         == osm.foresight()[0]
     )
 
-    custom_osm.setFuturePrice(spot + 1, False)
-    custom_osm.setCurrentPrice(spot - 1, False)
+    custom_osm.setFuturePrice(spot + 1e18, False)
+    custom_osm.setCurrentPrice(spot - 1e18, False)
+    assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot - 1e18
     assert (
         pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == osm.read()[0]
     )

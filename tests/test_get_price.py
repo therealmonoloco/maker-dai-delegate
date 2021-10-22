@@ -61,8 +61,7 @@ def test_future_osm_reverts_should_use_min_future_and_spot(
     custom_osm.setCurrentPrice(spot - 1e18, False)
     assert pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == spot - 1e18
     assert (
-        pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX)
-        == osm.read()[0]
+        pytest.approx(test_strategy._getPrice(), rel=RELATIVE_APPROX) == osm.read()[0]
     )
 
     custom_osm.setCurrentPrice(spot + 1e18, False)

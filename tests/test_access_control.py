@@ -184,14 +184,14 @@ def test_emergency_debt_repayment_acl(
     strategy.emergencyDebtRepayment(0, {"from": gov})
     assert strategy.balanceOfDebt() == 0
 
-    strategy.emergencyDebtRepayment(0, {"from": strategist})
-    assert strategy.balanceOfDebt() == 0
-
-    strategy.emergencyDebtRepayment(0, {"from": guardian})
-    assert strategy.balanceOfDebt() == 0
-
     strategy.emergencyDebtRepayment(0, {"from": management})
     assert strategy.balanceOfDebt() == 0
+
+    with reverts("!authorized"):
+        strategy.emergencyDebtRepayment(0, {"from": strategist})
+
+    with reverts("!authorized"):
+        strategy.emergencyDebtRepayment(0, {"from": guardian})
 
     with reverts("!authorized"):
         strategy.emergencyDebtRepayment(0, {"from": user})
@@ -244,14 +244,14 @@ def test_repay_debt_acl(
     strategy.repayDebtWithDaiBalance(1, {"from": gov})
     assert strategy.balanceOfDebt() == (debt_balance - 1)
 
-    strategy.repayDebtWithDaiBalance(2, {"from": strategist})
+    strategy.repayDebtWithDaiBalance(2, {"from": management})
     assert strategy.balanceOfDebt() == (debt_balance - 3)
 
-    strategy.repayDebtWithDaiBalance(3, {"from": management})
-    assert strategy.balanceOfDebt() == (debt_balance - 6)
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(3, {"from": strategist})
 
-    strategy.repayDebtWithDaiBalance(4, {"from": guardian})
-    assert strategy.balanceOfDebt() == (debt_balance - 10)
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(4, {"from": guardian})
 
     with reverts("!authorized"):
         strategy.repayDebtWithDaiBalance(5, {"from": keeper})

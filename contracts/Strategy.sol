@@ -278,7 +278,7 @@ contract Strategy is BaseStrategy {
     // Passing zero will repay all debt if possible
     function emergencyDebtRepayment(uint256 currentRatio)
         external
-        onlyEmergencyAuthorized
+        onlyVaultManagers
     {
         _repayDebt(currentRatio);
     }
@@ -291,7 +291,7 @@ contract Strategy is BaseStrategy {
     // we want to do a Dai airdrop and direct debt repayment instead
     function repayDebtWithDaiBalance(uint256 amount)
         external
-        onlyEmergencyAuthorized
+        onlyVaultManagers
     {
         _repayInvestmentTokenDebt(amount);
     }
@@ -480,9 +480,9 @@ contract Strategy is BaseStrategy {
 
         // Mint more DAI if possible
         return
-            isCurrentBaseFeeAcceptable() &&
             currentRatio > collateralizationRatio.add(rebalanceTolerance) &&
             balanceOfDebt() > 0 &&
+            isCurrentBaseFeeAcceptable() &&
             MakerDaiDelegateLib.isDaiAvailableToMint(ilk);
     }
 

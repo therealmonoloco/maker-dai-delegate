@@ -371,7 +371,7 @@ def test_tend_trigger_with_funds_in_cdp_but_no_debt_returns_false(
     chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
     chain.mine(1)
 
-    strategy.emergencyDebtRepayment(0, {"from": strategy.strategist()})
+    strategy.emergencyDebtRepayment(0, {"from": vault.management()})
 
     assert strategy.balanceOfMakerVault() > 0
     assert strategy.balanceOfDebt() == 0

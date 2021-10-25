@@ -15,7 +15,7 @@ library MakerDaiDelegateLib {
     uint256 internal constant RAY = 10**27;
 
     // Do not attempt to mint DAI if there are less than MIN_MINTABLE available
-    uint256 internal constant MIN_MINTABLE = 100000 * WAD;
+    uint256 internal constant MIN_MINTABLE = 500000 * WAD;
 
     // Maker vaults manager
     ManagerLike internal constant manager =

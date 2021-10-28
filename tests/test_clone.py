@@ -12,7 +12,6 @@ def test_double_init_should_revert(
     token,
     gemJoinAdapter,
     osmProxy,
-    price_oracle_usd,
     price_oracle_eth,
     gov,
 ):
@@ -26,7 +25,6 @@ def test_double_init_should_revert(
         "0x5946492d41000000000000000000000000000000000000000000000000000000",
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
     )
 
@@ -42,7 +40,6 @@ def test_double_init_should_revert(
             "0x5946492d41000000000000000000000000000000000000000000000000000000",
             gemJoinAdapter,
             osmProxy,
-            price_oracle_usd,
             price_oracle_eth,
             {"from": gov},
         )
@@ -55,7 +52,6 @@ def test_double_init_should_revert(
             "0x5946492d41000000000000000000000000000000000000000000000000000000",
             gemJoinAdapter,
             osmProxy,
-            price_oracle_usd,
             price_oracle_eth,
             {"from": gov},
         )
@@ -73,7 +69,6 @@ def test_clone(
     dai_whale,
     gemJoinAdapter,
     osmProxy,
-    price_oracle_usd,
     price_oracle_eth,
     gov,
 ):
@@ -87,7 +82,6 @@ def test_clone(
         strategy.ilk(),
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
     )
 
@@ -104,6 +98,7 @@ def test_clone(
     token.approve(vault, 2 ** 256 - 1, {"from": token_whale})
     vault.deposit(10 * (10 ** token.decimals()), {"from": token_whale})
 
+    chain.sleep(1)
     cloned_strategy.harvest({"from": gov})
     assert yvault.balanceOf(cloned_strategy) > 0
 
@@ -113,6 +108,8 @@ def test_clone(
 
     # Send some profit to yvDAI
     dai.transfer(yvault, Wei("100_000 ether"), {"from": dai_whale})
+
+    chain.sleep(1)
     cloned_strategy.harvest({"from": gov})
 
     assert vault.strategies(cloned_strategy).dict()["totalGain"] > 0
@@ -124,7 +121,6 @@ def test_clone_of_clone(strategy, cloner, yvault, strategist, token, osmProxy):
     gemJoinUNI = Contract("0x3BC3A58b4FC1CbE7e98bB4aB7c99535e8bA9b8F1")
     token = Contract("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984")
     yVaultUNI = Contract("0xFBEB78a723b8087fD2ea7Ef1afEc93d35E8Bed42")
-    chainlinkUNIToUSD = Contract("0x553303d460EE0afB37EdFf9bE42922D8FF63220e")
     chainlinkUNIToETH = Contract("0xD6aA3D25116d8dA79Ea0246c4826EB951872e02e")
     sushiswap = Contract("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
 
@@ -138,7 +134,6 @@ def test_clone_of_clone(strategy, cloner, yvault, strategist, token, osmProxy):
         "0x554e492d41000000000000000000000000000000000000000000000000000000",
         gemJoinUNI,
         osmProxy,
-        chainlinkUNIToUSD,
         chainlinkUNIToETH,
     )
 
@@ -154,6 +149,5 @@ def test_clone_of_clone(strategy, cloner, yvault, strategist, token, osmProxy):
         == "0x554e492d41000000000000000000000000000000000000000000000000000000"
     )
     assert cloned_strategy.wantToUSDOSMProxy() == osmProxy
-    assert cloned_strategy.chainlinkWantToUSDPriceFeed() == chainlinkUNIToUSD
     assert cloned_strategy.chainlinkWantToETHPriceFeed() == chainlinkUNIToETH
     assert cloned_strategy.gemJoinAdapter() == gemJoinUNI

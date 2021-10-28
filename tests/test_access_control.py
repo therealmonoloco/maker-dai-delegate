@@ -176,3 +176,85 @@ def test_migrate_dai_yvault_acl(
     strategy.harvest({"from": gov})
     strategy.migrateToNewDaiYVault(new_dai_yvault, {"from": gov})
     assert dai.allowance(strategy, new_dai_yvault) == 2 ** 256 - 1
+
+
+def test_emergency_debt_repayment_acl(
+    strategy, gov, strategist, management, guardian, user
+):
+    strategy.emergencyDebtRepayment(0, {"from": gov})
+    assert strategy.balanceOfDebt() == 0
+
+    strategy.emergencyDebtRepayment(0, {"from": management})
+    assert strategy.balanceOfDebt() == 0
+
+    with reverts("!authorized"):
+        strategy.emergencyDebtRepayment(0, {"from": strategist})
+
+    with reverts("!authorized"):
+        strategy.emergencyDebtRepayment(0, {"from": guardian})
+
+    with reverts("!authorized"):
+        strategy.emergencyDebtRepayment(0, {"from": user})
+
+
+def test_set_max_acceptable_base_fee_acl(
+    strategy, gov, strategist, management, guardian, user
+):
+    strategy.setMaxAcceptableBaseFee(100 * 1e9, {"from": gov})
+    assert strategy.maxAcceptableBaseFee() == 100 * 1e9
+
+    strategy.setMaxAcceptableBaseFee(200 * 1e9, {"from": strategist})
+    assert strategy.maxAcceptableBaseFee() == 200 * 1e9
+
+    strategy.setMaxAcceptableBaseFee(50 * 1e9, {"from": guardian})
+    assert strategy.maxAcceptableBaseFee() == 50 * 1e9
+
+    strategy.setMaxAcceptableBaseFee(75 * 1e9, {"from": management})
+    assert strategy.maxAcceptableBaseFee() == 75 * 1e9
+
+    with reverts("!authorized"):
+        strategy.setMaxAcceptableBaseFee(150 * 1e9, {"from": user})
+
+
+def test_repay_debt_acl(
+    vault,
+    strategy,
+    token,
+    amount,
+    dai,
+    dai_whale,
+    gov,
+    strategist,
+    management,
+    guardian,
+    keeper,
+    user,
+):
+    # Deposit to the vault
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
+    # Send funds through the strategy
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    dai.transfer(strategy, 1000 * 1e18, {"from": dai_whale})
+    debt_balance = strategy.balanceOfDebt()
+
+    strategy.repayDebtWithDaiBalance(1, {"from": gov})
+    assert strategy.balanceOfDebt() == (debt_balance - 1)
+
+    strategy.repayDebtWithDaiBalance(2, {"from": management})
+    assert strategy.balanceOfDebt() == (debt_balance - 3)
+
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(3, {"from": strategist})
+
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(4, {"from": guardian})
+
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(5, {"from": keeper})
+
+    with reverts("!authorized"):
+        strategy.repayDebtWithDaiBalance(6, {"from": user})

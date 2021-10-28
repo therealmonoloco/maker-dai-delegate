@@ -85,14 +85,6 @@ def yvault(yvDAI):
 
 
 @pytest.fixture
-def price_oracle_usd():
-    chainlink_oracle = interface.AggregatorInterface(
-        "0xA027702dbb89fbd58938e4324ac03B58d812b0E1"
-    )
-    yield chainlink_oracle
-
-
-@pytest.fixture
 def price_oracle_eth():
     chainlink_oracle = interface.AggregatorInterface(
         "0x7c5d4F8345e66f68099581Db340cd65B078C41f4"
@@ -189,7 +181,6 @@ def test_strategy(
     token,
     gemJoinAdapter,
     osmProxy,
-    price_oracle_usd,
     price_oracle_eth,
     gov,
 ):
@@ -201,7 +192,6 @@ def test_strategy(
         "0x5946492d41000000000000000000000000000000000000000000000000000000",
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
     )
     strategy.setLeaveDebtBehind(False, {"from": gov})
@@ -235,7 +225,6 @@ def cloner(
     token,
     gemJoinAdapter,
     osmProxy,
-    price_oracle_usd,
     price_oracle_eth,
     MakerDaiDelegateCloner,
 ):
@@ -247,7 +236,6 @@ def cloner(
         "0x5946492d41000000000000000000000000000000000000000000000000000000",
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
     )
     yield cloner

@@ -39,7 +39,7 @@ def management(accounts):
 
 @pytest.fixture
 def strategist(accounts):
-    yield accounts[4]
+    yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
 
 
 @pytest.fixture
@@ -89,14 +89,6 @@ def borrow_whale(dai_whale):
 @pytest.fixture
 def yvault(yvDAI):
     yield yvDAI
-
-
-@pytest.fixture
-def price_oracle_usd():
-    chainlink_oracle = interface.AggregatorInterface(
-        "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-    )
-    yield chainlink_oracle
 
 
 @pytest.fixture
@@ -182,10 +174,18 @@ def healthCheck():
 
 
 @pytest.fixture
+def custom_osm(TestCustomOSM, gov):
+    yield TestCustomOSM.deploy({"from": gov})
+
+
+@pytest.fixture
 def strategy(vault, Strategy, gov, osmProxy, cloner):
     strategy = Strategy.at(cloner.original())
     strategy.setLeaveDebtBehind(False, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
+
+    # set a high acceptable max base fee to avoid changing test behavior
+    strategy.setMaxAcceptableBaseFee(1500 * 1e9, {"from": gov})
 
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
@@ -203,7 +203,6 @@ def test_strategy(
     token,
     gemJoinAdapter,
     osmProxy,
-    price_oracle_usd,
     price_oracle_eth,
     gov,
 ):
@@ -215,11 +214,13 @@ def test_strategy(
         "0x4554482d43000000000000000000000000000000000000000000000000000000",
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
     )
     strategy.setLeaveDebtBehind(False, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
+
+    # set a high acceptable max base fee to avoid changing test behavior
+    strategy.setMaxAcceptableBaseFee(1500 * 1e9, {"from": gov})
 
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
@@ -250,7 +251,6 @@ def cloner(
     token,
     gemJoinAdapter,
     osmProxy,
-    price_oracle_usd,
     price_oracle_eth,
     MakerDaiDelegateCloner,
 ):
@@ -262,7 +262,6 @@ def cloner(
         "0x4554482d43000000000000000000000000000000000000000000000000000000",
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
     )
     yield cloner

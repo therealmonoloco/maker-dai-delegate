@@ -16,7 +16,6 @@ def test_ape_tax(
     gov,
     gemJoinAdapter,
     osmProxy,
-    price_oracle_usd,
     price_oracle_eth,
 ):
     vault = Contract("0x5120FeaBd5C21883a4696dBCC5D123d6270637E9")
@@ -33,7 +32,6 @@ def test_ape_tax(
         encode_single("bytes32", b"ETH-C"),
         gemJoinAdapter,
         osmProxy,
-        price_oracle_usd,
         price_oracle_eth,
         {"from": strategist},
     )

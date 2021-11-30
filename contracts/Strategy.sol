@@ -49,10 +49,6 @@ contract Strategy is BaseStrategy {
     ISwap internal constant uniswapRouter =
         ISwap(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
-    // Provider to read current block's base fee
-    IBaseFee internal constant baseFeeProvider =
-        IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549);
-
     // Token Adapter Module for collateral
     address public gemJoinAdapter;
 
@@ -80,14 +76,8 @@ contract Strategy is BaseStrategy {
     // Allow the collateralization ratio to drift a bit in order to avoid cycles
     uint256 public rebalanceTolerance;
 
-    // Max acceptable base fee to take more debt or harvest
-    uint256 public maxAcceptableBaseFee;
-
     // Maximum acceptable loss on withdrawal. Default to 0.01%.
     uint256 public maxLoss;
-
-    // If set to true the strategy will never try to repay debt by selling want
-    bool public leaveDebtBehind;
 
     // Name of the strategy
     string internal strategyName;
@@ -175,25 +165,11 @@ contract Strategy is BaseStrategy {
         // Use 225% as target
         collateralizationRatio = (225 * MAX_BPS) / 100;
 
-        // If we lose money in yvDAI then we are not OK selling want to repay it
-        leaveDebtBehind = true;
-
         // Define maximum acceptable loss on withdrawal to be 0.01%.
         maxLoss = 1;
-
-        // Set max acceptable base fee to take on more debt to 60 gwei
-        maxAcceptableBaseFee = 60 * 1e9;
     }
 
     // ----------------- SETTERS & MIGRATION -----------------
-
-    // Maximum acceptable base fee of current block to take on more debt
-    function setMaxAcceptableBaseFee(uint256 _maxAcceptableBaseFee)
-        external
-        onlyEmergencyAuthorized
-    {
-        maxAcceptableBaseFee = _maxAcceptableBaseFee;
-    }
 
     // Target collateralization ratio to maintain within bounds
     function setCollateralizationRatio(uint256 _collateralizationRatio)
@@ -229,31 +205,11 @@ contract Strategy is BaseStrategy {
         maxLoss = _maxLoss;
     }
 
-    // If set to true the strategy will never sell want to repay debts
-    function setLeaveDebtBehind(bool _leaveDebtBehind)
-        external
-        onlyEmergencyAuthorized
-    {
-        leaveDebtBehind = _leaveDebtBehind;
-    }
-
     // Required to move funds to a new cdp and use a different cdpId after migration
     // Should only be called by governance as it will move funds
     function shiftToCdp(uint256 newCdpId) external onlyGovernance {
         MakerDaiDelegateLib.shiftCdp(cdpId, newCdpId);
         cdpId = newCdpId;
-    }
-
-    // Move yvDAI funds to a new yVault
-    function migrateToNewDaiYVault(IVault newYVault) external onlyGovernance {
-        uint256 balanceOfYVault = yVault.balanceOf(address(this));
-        if (balanceOfYVault > 0) {
-            yVault.withdraw(balanceOfYVault, address(this), maxLoss);
-        }
-        investmentToken.safeApprove(address(yVault), 0);
-
-        yVault = newYVault;
-        _depositInvestmentTokenInYVault();
     }
 
     // Allow address to manage Maker's CDP
@@ -423,15 +379,6 @@ contract Strategy is BaseStrategy {
         amountToFree = Math.min(amountToFree, _maxWithdrawal());
         _freeCollateralAndRepayDai(amountToFree, 0);
 
-        // If we still need more want to repay, we may need to unlock some collateral to sell
-        if (
-            !leaveDebtBehind &&
-            balanceOfWant() < _amountNeeded &&
-            balanceOfDebt() > 0
-        ) {
-            _sellCollateralToRepayRemainingDebtIfNeeded();
-        }
-
         uint256 looseWant = balanceOfWant();
         if (_amountNeeded > looseWant) {
             _liquidatedAmount = looseWant;
@@ -448,15 +395,6 @@ contract Strategy is BaseStrategy {
         returns (uint256 _amountFreed)
     {
         (_amountFreed, ) = liquidatePosition(estimatedTotalAssets());
-    }
-
-    function harvestTrigger(uint256 callCost)
-        public
-        view
-        override
-        returns (bool)
-    {
-        return isCurrentBaseFeeAcceptable() && super.harvestTrigger(callCost);
     }
 
     function tendTrigger(uint256 callCostInWei)
@@ -477,13 +415,6 @@ contract Strategy is BaseStrategy {
         if (currentRatio < collateralizationRatio.sub(rebalanceTolerance)) {
             return true;
         }
-
-        // Mint more DAI if possible
-        return
-            currentRatio > collateralizationRatio.add(rebalanceTolerance) &&
-            balanceOfDebt() > 0 &&
-            isCurrentBaseFeeAcceptable() &&
-            MakerDaiDelegateLib.isDaiAvailableToMint(ilk);
     }
 
     function prepareMigration(address _newStrategy) internal override {
@@ -569,22 +500,6 @@ contract Strategy is BaseStrategy {
             _withdrawFromYVault(amountToRepay.sub(balanceIT));
         }
         _repayInvestmentTokenDebt(amountToRepay);
-    }
-
-    function _sellCollateralToRepayRemainingDebtIfNeeded() internal {
-        uint256 currentInvestmentValue = _valueOfInvestment();
-
-        uint256 investmentLeftToAcquire =
-            balanceOfDebt().sub(currentInvestmentValue);
-
-        uint256 investmentLeftToAcquireInWant =
-            _convertInvestmentTokenToWant(investmentLeftToAcquire);
-
-        if (investmentLeftToAcquireInWant <= balanceOfWant()) {
-            _buyInvestmentTokenWithWant(investmentLeftToAcquire);
-            _repayDebt(0);
-            _freeCollateralAndRepayDai(balanceOfMakerVault(), 0);
-        }
     }
 
     // Mint the maximum DAI possible for the locked collateral
@@ -772,22 +687,6 @@ contract Strategy is BaseStrategy {
             );
     }
 
-    // Check if current block's base fee is under max allowed base fee
-    function isCurrentBaseFeeAcceptable() public view returns (bool) {
-        uint256 baseFee;
-        try baseFeeProvider.basefee_global() returns (uint256 currentBaseFee) {
-            baseFee = currentBaseFee;
-        } catch {
-            // Useful for testing until ganache supports london fork
-            // Hard-code current base fee to 1000 gwei
-            // This should also help keepers that run in a fork without
-            // baseFee() to avoid reverting and potentially abandoning the job
-            baseFee = 1000 * 1e9;
-        }
-
-        return baseFee <= maxAcceptableBaseFee;
-    }
-
     // ----------------- INTERNAL CALCS -----------------
 
     // Returns the minimum price available
@@ -911,21 +810,6 @@ contract Strategy is BaseStrategy {
             _amount,
             0,
             _getTokenOutPath(tokenA, tokenB),
-            address(this),
-            now
-        );
-    }
-
-    function _buyInvestmentTokenWithWant(uint256 _amount) internal {
-        if (_amount == 0 || address(investmentToken) == address(want)) {
-            return;
-        }
-
-        _checkAllowance(address(router), address(want), _amount);
-        router.swapTokensForExactTokens(
-            _amount,
-            type(uint256).max,
-            _getTokenOutPath(address(want), address(investmentToken)),
             address(this),
             now
         );
